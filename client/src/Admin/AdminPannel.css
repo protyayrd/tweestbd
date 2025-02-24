@@ -1,0 +1,7 @@
+.adminContainer{
+    background-color: rgb(0, 0, 22) !important;
+    min-height: calc(100vh - 64px);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
