@@ -58,6 +58,22 @@ app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 console.log('Serving static files from:', path.join(__dirname, '../public'));
 console.log('Serving uploads from:', path.join(__dirname, '../public/uploads'));
 
+// Serve React build files in production
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from React build
+  app.use(express.static(path.join(__dirname, '../../client/build')));
+  
+  // For any route that doesn't match API routes, serve the React app
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path.startsWith('/uploads')) {
+      next();
+    } else {
+      res.sendFile(path.join(__dirname, '../../client/build', 'index.html'));
+    }
+  });
+  console.log('Serving React build from:', path.join(__dirname, '../../client/build'));
+}
+
 // Debug route to check file existence and serve file
 app.get('/check-file/:type/:filename', (req, res) => {
   const { type, filename } = req.params;
