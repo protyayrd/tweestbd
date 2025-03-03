@@ -1,7 +1,7 @@
-const express=require("express");
-const authenticate = require("../middleware/authenticat.js");
-const router=express.Router();
-const cartController=require("../controllers/cart.controller.js")
+const express = require("express");
+const authenticate = require("../middleware/authenticate.js");
+const router = express.Router();
+const cartController = require("../controllers/cart.controller.js");
 
 // GET: /api/cart
 router.get("/", authenticate, cartController.findUserCart);
@@ -18,4 +18,8 @@ router.put("/update/:cartItemId", authenticate, cartController.updateCartItem);
 // GET: /api/cart/item/:cartItemId
 router.get("/item/:cartItemId", authenticate, cartController.getCartItem);
 
-module.exports=router;
+// Promo code routes
+router.post("/apply-promo", authenticate, cartController.applyPromoCode);
+router.delete("/remove-promo", authenticate, cartController.removePromoCode);
+
+module.exports = router;

@@ -2,6 +2,7 @@ import React from 'react';
 import { Grid, Typography, Link, Box, Container, IconButton, Stack } from '@mui/material';
 import { Facebook, Instagram, Twitter, YouTube, WhatsApp, Email, Phone, LocationOn } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { LOGO_CONFIG, getLogoStyles } from '../../../config/logo';
 
 const Footer = () => {
   const navigate = useNavigate();
@@ -16,10 +17,11 @@ const Footer = () => {
               {/* Brand Section */}
               <Grid item xs={12} md={4} lg={5}>
                 <Box sx={{ pr: { md: 8 } }}>
-                  <img 
-                    src="/images/logo.png" 
-                    alt="Tweest BD" 
-                    style={{ height: '36px', marginBottom: '24px' }} 
+                  <Box
+                    component="img"
+                    src={LOGO_CONFIG.MAIN_LOGO}
+                    alt={LOGO_CONFIG.ALT_TEXT}
+                    sx={getLogoStyles('default')}
                   />
                   <Typography 
                     variant="body1" 

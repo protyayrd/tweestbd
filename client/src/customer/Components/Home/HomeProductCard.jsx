@@ -88,10 +88,13 @@ const PriceContainer = styled(Box)({
 });
 
 const HomeProductCard = ({ product }) => {
-  const navigate = useNavigate();
-
-  const handleClick = () => {
-    navigate(`/product/${product._id}`);
+  const handleClick = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const url = `/product/${product._id}`;
+    window.location.assign(url);
   };
 
   // Get the first two images from the first color
@@ -99,7 +102,16 @@ const HomeProductCard = ({ product }) => {
   const secondaryImage = product.colors?.[0]?.images?.[1] || primaryImage; // Fallback to primary if no second image
 
   return (
-    <ProductCard onClick={handleClick}>
+    <ProductCard 
+      onClick={handleClick}
+      component="a"
+      href={`/product/${product._id}`}
+      sx={{ 
+        textDecoration: 'none',
+        cursor: 'pointer',
+        zIndex: 10
+      }}
+    >
       <ImageContainer>
         <ProductImage
           className="primary-image"

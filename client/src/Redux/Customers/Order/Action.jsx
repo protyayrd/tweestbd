@@ -21,7 +21,10 @@ export const createOrder = (reqData) => async (dispatch) => {
       orderItems: reqData.orderItems,
       totalPrice: reqData.totalPrice,
       totalDiscountedPrice: reqData.totalDiscountedPrice,
-      discounte: reqData.discounte,
+      discount: reqData.discount,
+      productDiscount: reqData.productDiscount,
+      promoCodeDiscount: reqData.promoCodeDiscount,
+      promoDetails: reqData.promoDetails,
       totalItem: reqData.totalItem
     };
 
@@ -38,10 +41,6 @@ export const createOrder = (reqData) => async (dispatch) => {
       }
     );
     
-    if (data._id) {
-      reqData.navigate({ search: `step=3&order_id=${data._id}` });
-    }
-
     dispatch({
       type: CREATE_ORDER_SUCCESS,
       payload: data,
@@ -105,11 +104,13 @@ export const getOrderHistory = (reqData) => async (dispatch) => {
 
     const { data } = await api.get(`/api/orders/user`, config);
     console.log("order history -------- ", data);
+    
     dispatch({
       type: GET_ORDER_HISTORY_SUCCESS,
-      payload: data,
+      payload: data.data,
     });
   } catch (error) {
+    console.error("Error fetching order history:", error);
     dispatch({
       type: GET_ORDER_HISTORY_FAILURE,
       payload:

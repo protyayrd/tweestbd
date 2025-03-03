@@ -211,6 +211,7 @@ async function createMultipleProduct(products) {
 async function findProducts(reqData) {
   let {
     category,
+    categories,
     colors,
     sizes,
     minPrice,
@@ -220,14 +221,19 @@ async function findProducts(reqData) {
     stock,
     pageNumber,
     pageSize,
-    isNewArrival
+    isNewArrival,
+    search
   } = reqData;
 
   pageSize = pageSize || 10;
-
   let query = Product.find();
 
-  if (category) {
+  // Handle category filtering
+  if (categories && categories.length > 0) {
+    // If multiple categories are provided, use $in operator
+    query = query.where("category").in(categories);
+  } else if (category) {
+    // If single category is provided, use equals
     query = query.where("category").equals(category);
   }
 
@@ -240,7 +246,7 @@ async function findProducts(reqData) {
   }
 
   if (sizes && sizes.length > 0) {
-    query = query.where("sizes.name").in(sizes);
+    query = query.where("colors.sizes.name").in(sizes);
   }
 
   if (minPrice && maxPrice) {
@@ -251,35 +257,63 @@ async function findProducts(reqData) {
     query = query.where("discountPersent").gte(minDiscount);
   }
 
-  if (stock) {
-    if (stock === "in_stock") {
-      query = query.where("quantity").gt(0);
-    } else if (stock === "out_of_stock") {
-      query = query.where("quantity").lt(1);
+  if (stock !== undefined) {
+    if (stock === 'in_stock') {
+      query = query.where("colors.sizes.quantity").gt(0);
+    } else if (stock === 'out_of_stock') {
+      query = query.where("colors.sizes.quantity").equals(0);
     }
   }
 
+  if (search) {
+    query = query.where({
+      $or: [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ]
+    });
+  }
+
+  // Apply sorting
   if (sort) {
-    const sortDirection = sort.split("_")[1];
-    const sortField = sort.split("_")[0];
-    
-    if (sortDirection === "desc") {
-      query = query.sort({ [sortField]: -1 });
-    } else if (sortDirection === "asc") {
-      query = query.sort({ [sortField]: 1 });
+    switch (sort) {
+      case 'price_low':
+        query = query.sort({ discountedPrice: 1 });
+        break;
+      case 'price_high':
+        query = query.sort({ discountedPrice: -1 });
+        break;
+      case 'newest':
+        query = query.sort({ createdAt: -1 });
+        break;
+      default:
+        query = query.sort({ createdAt: -1 });
     }
+  } else {
+    query = query.sort({ createdAt: -1 });
   }
 
+  // Get total count before pagination
   const totalProducts = await Product.countDocuments(query);
-  const skip = (pageNumber - 1) * pageSize;
 
-  const products = await query.skip(skip).limit(pageSize).exec();
+  // Apply pagination
+  const skip = (pageNumber - 1) * pageSize;
+  query = query
+    .skip(skip)
+    .limit(pageSize)
+    .populate({
+      path: 'category',
+      select: 'name level parentCategory'
+    });
+
+  // Execute query
+  const products = await query.exec();
 
   return {
     content: products,
     currentPage: pageNumber,
     totalPages: Math.ceil(totalProducts / pageSize),
-    totalElements: totalProducts,
+    totalProducts
   };
 }
 

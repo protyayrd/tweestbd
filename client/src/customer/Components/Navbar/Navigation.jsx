@@ -9,13 +9,14 @@ import {
   ChevronUpIcon,
 } from "@heroicons/react/24/outline";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Avatar, Button, Menu, MenuItem } from "@mui/material";
+import { Avatar, Button, Menu, MenuItem, Box } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
 import { getUser, logout } from "../../../Redux/Auth/Action";
 import { getCart } from "../../../Redux/Customers/Cart/Action";
 import { getCategories } from "../../../Redux/Admin/Category/Action";
 import { findProducts } from "../../../Redux/Customers/Product/Action";
 import { API_BASE_URL } from "../../../config/api";
+import { LOGO_CONFIG, getLogoStyles } from "../../../config/logo";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -161,7 +162,7 @@ export default function Navigation() {
       event.stopPropagation();
     }
     if (!isLevel2) {
-      navigate(`/products?category/${categoryId}`);
+      navigate(`/products?category=${categoryId}&page=1`);
       setOpen(false);
     }
   };
@@ -288,7 +289,12 @@ export default function Navigation() {
             {/* Center Section - Logo */}
             <div className="w-1/3 flex justify-center">
               <Link to="/" className="flex items-center justify-center">
-                <img src="/images/logo.png" alt="Tweest BD" className="h-8 sm:h-10 md:h-12 w-auto transition-all duration-200" />
+                <Box
+                  component="img"
+                  src={LOGO_CONFIG.MAIN_LOGO}
+                  alt={LOGO_CONFIG.ALT_TEXT}
+                  sx={getLogoStyles('default')}
+                />
               </Link>
             </div>
 
@@ -477,7 +483,12 @@ export default function Navigation() {
               <Dialog.Panel className="relative flex w-full max-w-xs flex-col overflow-y-auto bg-white pb-12 shadow-xl">
                 <div className="sticky top-0 z-10 bg-white px-4 py-4 flex items-center justify-between border-b border-gray-100">
                   <Link to="/" className="flex items-center space-x-3">
-                    <img src="/images/logo.png" alt="Tweest BD" className="h-6 w-auto" />
+                    <Box
+                      component="img"
+                      src={LOGO_CONFIG.MAIN_LOGO}
+                      alt={LOGO_CONFIG.ALT_TEXT}
+                      sx={getLogoStyles('small')}
+                    />
                   </Link>
                   <button
                     type="button"

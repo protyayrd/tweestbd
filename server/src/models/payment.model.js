@@ -6,10 +6,15 @@ const paymentSchema = new mongoose.Schema({
         ref: 'orders',
         required: true
     },
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'users',
+        required: true
+    },
     paymentMethod: {
         type: String,
         required: true,
-        enum: ['bKash', 'Nagad', 'Rocket']
+        enum: ['SSLCommerz']
     },
     transactionId: {
         type: String,
@@ -22,13 +27,19 @@ const paymentSchema = new mongoose.Schema({
     },
     paymentPhoneNumber: {
         type: String,
-        required: true
+        required: false
     },
     status: {
         type: String,
         required: true,
         default: 'PENDING',
-        enum: ['PENDING', 'VERIFIED', 'FAILED']
+        enum: ['PENDING', 'COMPLETED', 'VERIFIED', 'FAILED', 'CANCELLED']
+    },
+    paymentDetails: {
+        type: Object
+    },
+    validationId: {
+        type: String
     },
     createdAt: {
         type: Date,

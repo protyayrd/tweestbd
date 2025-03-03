@@ -14,7 +14,7 @@ const createPayment = async (paymentData) => {
         console.log('Found order:', order._id);
 
         // Validate payment data
-        if (!paymentData.paymentMethod || !paymentData.transactionId || !paymentData.paymentPhoneNumber) {
+        if (!paymentData.paymentMethod || !paymentData.transactionId) {
             throw new Error('Missing required payment fields');
         }
 
@@ -27,10 +27,11 @@ const createPayment = async (paymentData) => {
         // Create new payment
         const payment = new Payment({
             order: order._id,
+            user: order.user,
             paymentMethod: paymentData.paymentMethod,
             transactionId: paymentData.transactionId,
             amount: order.totalDiscountedPrice,
-            paymentPhoneNumber: paymentData.paymentPhoneNumber,
+            paymentPhoneNumber: paymentData.paymentPhoneNumber || '',
         });
 
         console.log('Created payment object:', JSON.stringify(payment, null, 2));
@@ -43,6 +44,8 @@ const createPayment = async (paymentData) => {
         order.orderStatus = 'CONFIRMED';
         order.paymentDetails = {
             paymentId: savedPayment._id,
+            paymentMethod: savedPayment.paymentMethod,
+            transactionId: savedPayment.transactionId,
             status: 'COMPLETED'
         };
         await order.save();

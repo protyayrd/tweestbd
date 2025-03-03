@@ -51,9 +51,6 @@ export default function ProductDetails() {
   const [selectedSize, setSelectedSize] = useState();
   const [selectedColor, setSelectedColor] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [promoCode, setPromoCode] = useState('');
-  const [promoCodeError, setPromoCodeError] = useState('');
-  const [discount, setDiscount] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [sizeGuideData, setSizeGuideData] = useState(null);
@@ -123,30 +120,7 @@ export default function ProductDetails() {
     }
   };
 
-  const validatePromoCode = async () => {
-    try {
-      const response = await api.post('/api/promo-codes/validate', {
-        code: promoCode,
-        productId,
-        orderAmount: customersProduct.product?.discountedPrice || 0
-      });
-
-      if (response.data.valid) {
-        setDiscount(response.data.discount);
-        setPromoCodeError('');
-        setSnackbar({
-          open: true,
-          message: 'Promo code applied successfully!',
-          severity: 'success'
-        });
-      }
-    } catch (error) {
-      setPromoCodeError(error.response?.data?.message || 'Invalid promo code');
-      setDiscount(0);
-    }
-  };
-
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedSize) {
       setSnackbar({
         open: true,
@@ -165,15 +139,50 @@ export default function ProductDetails() {
       return;
     }
 
-    const data = { 
-      productId, 
-      size: selectedSize.name,
-      color: selectedColor.name,
-      price: finalPrice,
-      discountedPrice: finalPrice - discount
-    };
-    dispatch(addItemToCart({ data }));
-    navigate("/cart");
+    try {
+      const data = {
+        productId: customersProduct.product._id,
+        size: selectedSize.name,
+        color: selectedColor.name,
+        quantity: 1,
+        price: customersProduct.product.price,
+        discountedPrice: customersProduct.product.discountedPrice || customersProduct.product.price
+      };
+
+      console.log('Adding to cart:', data);
+      
+      const response = await dispatch(addItemToCart(data));
+      console.log('Add to cart response:', response);
+
+      if (response && response.payload) {
+        setSnackbar({
+          open: true,
+          message: 'Product added to cart successfully!',
+          severity: 'success'
+        });
+        navigate("/cart");
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      
+      // Handle authentication errors
+      if (error.response?.status === 401 || error.message === 'Authentication required') {
+        setSnackbar({
+          open: true,
+          message: 'Please login to add items to cart',
+          severity: 'error'
+        });
+        navigate('/login');
+        return;
+      }
+
+      // Handle other errors
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Error adding item to cart. Please try again.',
+        severity: 'error'
+      });
+    }
   };
 
   // Initialize product with default values
@@ -198,7 +207,7 @@ export default function ProductDetails() {
   }
 
   const currentImage = selectedColor?.images?.[currentImageIndex];
-  const finalPrice = (customersProduct.product?.discountedPrice || 0) - discount;
+  const finalPrice = customersProduct.product?.discountedPrice || customersProduct.product?.price || 0;
 
   // Format the description text to show in multiple lines
   const formatDescription = (description) => {
@@ -322,11 +331,6 @@ export default function ProductDetails() {
                     {customersProduct.product?.discountPersent}% Off
                   </span>
                 </div>
-                {discount > 0 && (
-                  <p className="mt-2 text-sm text-blue-600">
-                    Extra Tk. {discount} off applied
-                  </p>
-                )}
               </div>
 
               {/* Colors */}
@@ -413,41 +417,6 @@ export default function ProductDetails() {
                       </div>
                     </Tooltip>
                   ))}
-                </div>
-              </div>
-
-              {/* Promo Code */}
-              <div className="border-t border-gray-200 pt-6">
-                <div className="flex gap-2">
-                  <TextField
-                    fullWidth
-                    placeholder="Enter promo code"
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value)}
-                    error={!!promoCodeError}
-                    helperText={promoCodeError}
-                    size="small"
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '6px',
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="outlined"
-                    onClick={validatePromoCode}
-                    sx={{ 
-                      minWidth: '100px',
-                      color: 'black',
-                      borderColor: 'black',
-                      '&:hover': {
-                        borderColor: 'black',
-                        backgroundColor: 'rgba(0,0,0,0.04)'
-                      }
-                    }}
-                  >
-                    Apply
-                  </Button>
                 </div>
               </div>
 

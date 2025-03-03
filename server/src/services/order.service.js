@@ -104,13 +104,21 @@ async function createOrder(user, orderData) {
 
     console.log("Creating order with items:", orderItems);
     const createdOrder = new Order({
-      user: user._id,  // Store just the user ID
+      user: user._id,
       orderItems,
       totalPrice: orderData.totalPrice,
       totalDiscountedPrice: orderData.totalDiscountedPrice,
-      discounte: orderData.discounte,
+      discount: orderData.discount,
+      productDiscount: orderData.productDiscount || (orderData.discount - (orderData.promoCodeDiscount || 0)),
+      promoCodeDiscount: orderData.promoCodeDiscount || 0,
+      promoDetails: orderData.promoDetails || {
+        code: null,
+        discountType: null,
+        discountAmount: 0,
+        maxDiscountAmount: null
+      },
       totalItem: orderData.totalItem,
-      shippingAddress: address._id,  // Store just the address ID
+      shippingAddress: address._id,
       orderDate: new Date(),
       orderStatus: "PLACED",
       "paymentDetails.status": "PENDING",

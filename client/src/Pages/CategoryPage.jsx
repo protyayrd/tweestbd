@@ -146,10 +146,7 @@ const CategoryPage = () => {
       // Create a query object for better handling
       const queryParams = new URLSearchParams();
       
-      // Add the main category
-      queryParams.append('category', categoryId);
-      
-      // Add subcategories if they exist
+      // Only add subcategories if they exist
       if (subcategories.length > 0) {
         subcategories.forEach(sub => {
           queryParams.append('subcategories', sub._id);

@@ -15,12 +15,14 @@ import Order from "../customer/Components/orders/Order";
 import OrderDetails from "../customer/Components/orders/OrderDetails";
 import Checkout from "../customer/Components/Checkout/Checkout";
 import Footer from "../customer/Components/footer/Footer";
-import PaymentSuccess from "../customer/Components/paymentSuccess/PaymentSuccess";
+import PaymentSuccess from "../customer/Components/Payment/PaymentSuccess";
+import PaymentFailed from "../customer/Components/Payment/PaymentFailed";
+import PaymentCancelled from "../customer/Components/Payment/PaymentCancelled";
 import RateProduct from "../customer/Components/ReviewProduct/RateProduct";
 import CategoryPage from "../Pages/CategoryPage";
 import LoginPage from "../Pages/Auth/LoginPage";
 import RegisterPage from "../Pages/Auth/RegisterPage";
-import EdushopCategoryPage from '../Pages/EdushopCategoryPage';
+import ComingSoonCategory from '../customer/Components/Category/ComingSoonCategory';
 
 const CustomerRoutes = () => {
   const location = useLocation();
@@ -43,6 +45,7 @@ const CustomerRoutes = () => {
           <Route path="/terms-condition" element={<TearmsCondition />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/category/:categoryId" element={<CategoryPage />} />
+          <Route path="/category/coming-soon/:categoryId" element={<ComingSoonCategory />} />
           <Route path="/products" element={<Product />} />
           <Route path="/product/:productId" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
@@ -50,8 +53,11 @@ const CustomerRoutes = () => {
           <Route path="/account/order/:orderId" element={<OrderDetails />} />
           <Route path="/account/rate/:productId" element={<RateProduct />} />
           <Route path="/checkout" element={<Checkout />} />
-          <Route path="/payment/:orderId" element={<PaymentSuccess />} />
-          <Route path="/edushop/:categoryId" element={<EdushopCategoryPage />} />
+          
+          {/* Payment result pages */}
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/failed" element={<PaymentFailed />} />
+          <Route path="/payment/cancelled" element={<PaymentCancelled />} />
         </Routes>
         {showNavigation && <Footer />}
       </ThemeProvider>

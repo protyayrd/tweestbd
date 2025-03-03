@@ -46,11 +46,44 @@ export default function Checkout() {
   };
 
   return (
-    <Box className="px-5 lg:px-32" sx={{ width: "100%" }}>
-      <Stepper activeStep={step - 1}>
+    <Box className="px-5 lg:px-32" sx={{ width: "100%", bgcolor: "#ffffff" }}>
+      <Stepper 
+        activeStep={step - 1}
+        sx={{
+          pt: 4,
+          pb: 2,
+          '& .MuiStepLabel-root .Mui-completed': {
+            color: '#000000', 
+          },
+          '& .MuiStepLabel-root .Mui-active': {
+            color: '#000000',
+          },
+          '& .MuiStepLabel-root .Mui-active .MuiStepIcon-text': {
+            fill: '#ffffff',
+          },
+          '& .MuiStepConnector-line': {
+            borderColor: '#000000',
+          }
+        }}
+      >
         {steps.map((label) => (
           <Step key={label}>
-            <StepLabel>{label}</StepLabel>
+            <StepLabel 
+              sx={{
+                '& .MuiStepLabel-label': {
+                  color: '#000000',
+                  '&.Mui-active': {
+                    color: '#000000',
+                    fontWeight: 'bold',
+                  },
+                  '&.Mui-completed': {
+                    color: '#000000',
+                  }
+                }
+              }}
+            >
+              {label}
+            </StepLabel>
           </Step>
         ))}
       </Stepper>
@@ -59,12 +92,24 @@ export default function Checkout() {
         {renderStepContent()}
       </div>
 
-      <Box sx={{ display: "flex", flexDirection: "row", pt: 2 }}>
+      <Box sx={{ display: "flex", flexDirection: "row", pt: 2, pb: 4 }}>
         <Button
-          color="inherit"
+          variant="outlined"
           disabled={step === 2}
           onClick={handleBack}
-          sx={{ mr: 1 }}
+          sx={{ 
+            mr: 1, 
+            color: '#000000', 
+            borderColor: '#000000',
+            '&:hover': {
+              borderColor: '#333333',
+              backgroundColor: 'rgba(0, 0, 0, 0.04)'
+            },
+            '&.Mui-disabled': {
+              borderColor: '#cccccc',
+              color: '#cccccc'
+            }
+          }}
         >
           Back
         </Button>

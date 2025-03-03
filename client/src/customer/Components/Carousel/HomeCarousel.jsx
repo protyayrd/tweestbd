@@ -152,7 +152,9 @@ const HomeCarousel = () => {
         <h1 className="title">{category.name}</h1>
         <button 
           className="shop-button"
-          onClick={() => navigate(`/products?category/${category._id}`)}
+          onClick={() => {
+            window.location.href = `/products?category=${category._id}`;
+          }}
         >
           Shop Now
         </button>

@@ -121,7 +121,7 @@ api.interceptors.response.use(
       return Promise.reject({
         response: {
           status: error.response.status,
-          data: { message: 'Server error. Please try again later.' }
+          data: { message: 'Please login to continue.' }
         }
       });
     }

@@ -11,6 +11,12 @@ import {
   UPDATE_CART_ITEM_FAILURE,
   UPDATE_CART_ITEM_REQUEST,
   UPDATE_CART_ITEM_SUCCESS,
+  APPLY_PROMO_CODE_REQUEST,
+  APPLY_PROMO_CODE_SUCCESS,
+  APPLY_PROMO_CODE_FAILURE,
+  REMOVE_PROMO_CODE_REQUEST,
+  REMOVE_PROMO_CODE_SUCCESS,
+  REMOVE_PROMO_CODE_FAILURE
 } from "./ActionType";
 
 const initialState = {
@@ -21,7 +27,9 @@ const initialState = {
   totalPrice: 0,
   totalItem: 0,
   totalDiscountedPrice: 0,
-  discounte: 0
+  discount: 0,
+  promoCodeDiscount: 0,
+  promoDetails: null
 };
 
 const cartReducer = (state = initialState, action) => {
@@ -30,6 +38,8 @@ const cartReducer = (state = initialState, action) => {
     case ADD_ITEM_TO_CART_REQUEST:
     case REMOVE_CART_ITEM_REQUEST:
     case UPDATE_CART_ITEM_REQUEST:
+    case APPLY_PROMO_CODE_REQUEST:
+    case REMOVE_PROMO_CODE_REQUEST:
       return {
         ...state,
         loading: true,
@@ -37,19 +47,9 @@ const cartReducer = (state = initialState, action) => {
       };
 
     case GET_CART_SUCCESS:
-      return {
-        ...state,
-        loading: false,
-        error: null,
-        cart: action.payload,
-        cartItems: action.payload.cartItems || [],
-        totalPrice: action.payload.totalPrice || 0,
-        totalItem: action.payload.totalItem || 0,
-        totalDiscountedPrice: action.payload.totalDiscountedPrice || 0,
-        discounte: action.payload.discounte || 0
-      };
-
     case ADD_ITEM_TO_CART_SUCCESS:
+    case UPDATE_CART_ITEM_SUCCESS:
+    case APPLY_PROMO_CODE_SUCCESS:
       return {
         ...state,
         loading: false,
@@ -59,7 +59,24 @@ const cartReducer = (state = initialState, action) => {
         totalPrice: action.payload.totalPrice || 0,
         totalItem: action.payload.totalItem || 0,
         totalDiscountedPrice: action.payload.totalDiscountedPrice || 0,
-        discounte: action.payload.discounte || 0
+        discount: action.payload.discount || 0,
+        promoCodeDiscount: action.payload.promoCodeDiscount || 0,
+        promoDetails: action.payload.promoDetails || null
+      };
+      
+    case REMOVE_PROMO_CODE_SUCCESS:
+      return {
+        ...state,
+        loading: false,
+        error: null,
+        cart: action.payload,
+        cartItems: action.payload.cartItems || [],
+        totalPrice: action.payload.totalPrice || 0,
+        totalItem: action.payload.totalItem || 0,
+        totalDiscountedPrice: action.payload.totalDiscountedPrice || 0,
+        discount: action.payload.discount || 0,
+        promoCodeDiscount: 0,
+        promoDetails: null
       };
 
     case REMOVE_CART_ITEM_SUCCESS:
@@ -71,33 +88,16 @@ const cartReducer = (state = initialState, action) => {
         totalItem: state.totalItem > 0 ? state.totalItem - 1 : 0
       };
 
-    case UPDATE_CART_ITEM_SUCCESS:
-      return {
-        ...state,
-        loading: false,
-        error: null,
-        cart: action.payload,
-        cartItems: action.payload.cartItems || [],
-        totalPrice: action.payload.totalPrice || 0,
-        totalItem: action.payload.totalItem || 0,
-        totalDiscountedPrice: action.payload.totalDiscountedPrice || 0,
-        discounte: action.payload.discounte || 0
-      };
-
     case GET_CART_FAILURE:
     case ADD_ITEM_TO_CART_FAILURE:
     case REMOVE_CART_ITEM_FAILURE:
     case UPDATE_CART_ITEM_FAILURE:
+    case APPLY_PROMO_CODE_FAILURE:
+    case REMOVE_PROMO_CODE_FAILURE:
       return {
         ...state,
         loading: false,
-        error: action.payload,
-        cart: null,
-        cartItems: [],
-        totalPrice: 0,
-        totalItem: 0,
-        totalDiscountedPrice: 0,
-        discounte: 0
+        error: action.payload
       };
 
     default:

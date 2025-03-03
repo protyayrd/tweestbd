@@ -1,0 +1,9 @@
+// Error handler utility function
+const errorHandler = (statusCode, message) => {
+  const error = new Error();
+  error.statusCode = statusCode;
+  error.message = message;
+  return error;
+};
+
+module.exports = { errorHandler }; 

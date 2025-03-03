@@ -43,11 +43,8 @@ const PaymentForm = ({ handleNext }) => {
   const { payment } = useSelector(state => state);
 
   // Payment form states
-  const [paymentMethod, setPaymentMethod] = useState("bKash");
-  const [transactionId, setTransactionId] = useState("");
-  const [paymentPhoneNumber, setPaymentPhoneNumber] = useState("");
-  const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     // Check if we have an order ID
@@ -66,7 +63,7 @@ const PaymentForm = ({ handleNext }) => {
     }
   }, [payment, navigate]);
 
-  const handleCreatePayment = async (e) => {
+  const handleSSLCommerzPayment = async (e) => {
     e.preventDefault();
     setFormError("");
     setIsSubmitting(true);
@@ -76,50 +73,41 @@ const PaymentForm = ({ handleNext }) => {
       setIsSubmitting(false);
       return;
     }
-
-    if (!transactionId || !paymentPhoneNumber) {
-      setFormError("Please fill in all payment details");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Validate phone number format
-    const phoneRegex = /^\+?880\d{10}$/;
-    if (!phoneRegex.test(paymentPhoneNumber.replace(/\s+/g, ''))) {
-      setFormError("Please enter a valid Bangladesh phone number (+880XXXXXXXXXX)");
-      setIsSubmitting(false);
-      return;
-    }
+    
+    // Get customer information from the order if available
+    const customerInfo = order.order?.user || {};
+    const shippingAddress = order.order?.shippingAddress || {};
     
     const data = {
       orderId: order.order._id,
       jwt,
-      paymentMethod,
-      transactionId: transactionId.trim(),
-      paymentPhoneNumber: paymentPhoneNumber.trim().replace(/\s+/g, ''),
-      status: 'PENDING',
-      amount: order.order.totalDiscountedPrice
+      amount: order.order.totalDiscountedPrice,
+      // Add customer information for SSLCommerz
+      customerName: customerInfo.fullName || shippingAddress.firstName + ' ' + shippingAddress.lastName || '',
+      customerEmail: customerInfo.email || '',
+      paymentPhoneNumber: shippingAddress.mobile || customerInfo.mobile || '',
+      // Add a unique transaction ID (will be generated on server)
+      transactionId: `ORDER-${order.order._id}-${Date.now()}`
     };
+    
+    console.log('Sending payment data:', data);
     
     try {
       const result = await dispatch(createPayment(data));
       console.log('Payment result:', result);
 
-      if (result?.payload?.success) {
-        // Show success message and navigate
-        setTransactionId('');
-        setPaymentPhoneNumber('');
-        navigate('/account/order');
-      } else if (result?.error) {
+      // The redirect to SSLCommerz payment gateway is handled in the Action.js
+      // If we reach here, it means there was an issue with the redirect
+      if (result?.error) {
         setFormError(result.error);
         setIsSubmitting(false);
-      } else {
-        setFormError("Unable to process payment. Please try again.");
+      } else if (!result?.payment_link_url) {
+        setFormError("Unable to initialize payment gateway. Please try again.");
         setIsSubmitting(false);
       }
     } catch (error) {
       console.error('Payment error:', error);
-      setFormError("Payment submission failed. Please try again.");
+      setFormError("Payment initialization failed. Please try again.");
       setIsSubmitting(false);
     }
   };
@@ -128,62 +116,81 @@ const PaymentForm = ({ handleNext }) => {
     <Grid container spacing={4}>
       <Grid item xs={12} md={8}>
         <Paper elevation={0} className="border p-5" sx={{
-          borderColor: 'grey.300',
-          bgcolor: 'background.paper',
+          borderColor: '#000000',
+          bgcolor: '#ffffff',
           borderRadius: 2
         }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#000000' }}>
             Payment Details
           </Typography>
 
-          <form onSubmit={handleCreatePayment}>
+          <form onSubmit={handleSSLCommerzPayment}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <FormControl fullWidth sx={commonTextFieldStyles}>
-                  <InputLabel>Payment Method</InputLabel>
-                  <Select
-                    value={paymentMethod}
-                    label="Payment Method"
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    disabled={isSubmitting}
-                  >
-                    <MenuItem value="bKash">bKash</MenuItem>
-                    <MenuItem value="Nagad">Nagad</MenuItem>
-                    <MenuItem value="Rocket">Rocket</MenuItem>
-                  </Select>
-                </FormControl>
+                <Box sx={{ 
+                  p: 3, 
+                  border: '1px solid', 
+                  borderColor: '#000000', 
+                  borderRadius: 2,
+                  textAlign: 'center',
+                  bgcolor: '#f5f5f5'
+                }}>
+                  <img 
+                    src="https://securepay.sslcommerz.com/public/image/SSLCommerz-Pay-With-logo-All-Size-01.png" 
+                    alt="SSLCommerz" 
+                    style={{ maxWidth: '100%', height: 'auto', maxHeight: '80px' }}
+                  />
+                  <Typography variant="body1" sx={{ mt: 2, color: '#000000' }}>
+                    Pay securely using SSLCommerz payment gateway
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1, color: '#000000' }}>
+                    You will be redirected to SSLCommerz secure payment page
+                  </Typography>
+                </Box>
               </Grid>
 
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Transaction ID"
-                  value={transactionId}
-                  onChange={(e) => setTransactionId(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                  sx={commonTextFieldStyles}
-                  helperText="Enter the transaction ID from your mobile banking app"
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Payment Phone Number"
-                  value={paymentPhoneNumber}
-                  onChange={(e) => setPaymentPhoneNumber(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                  sx={commonTextFieldStyles}
-                  placeholder="e.g., +880 1XXX-XXXXXX"
-                  helperText="Enter the phone number used for payment"
-                />
+                <Alert 
+                  severity="info" 
+                  sx={{ 
+                    mb: 2,
+                    '& .MuiAlert-icon': {
+                      color: '#000000'
+                    },
+                    '& .MuiAlert-message': {
+                      color: '#000000'
+                    },
+                    bgcolor: '#f5f5f5',
+                    border: '1px solid #000000'
+                  }}
+                >
+                  <Typography variant="body2" color="#000000">
+                    <strong>This is a sandbox/test environment.</strong> Use the following test credentials:
+                  </Typography>
+                  <Box component="ul" sx={{ mt: 1, pl: 2, color: '#000000' }}>
+                    <li>Card Number: 4111 1111 1111 1111</li>
+                    <li>Expiry: Any future date</li>
+                    <li>CVC: Any 3 digits</li>
+                    <li>Name: Any name</li>
+                  </Box>
+                </Alert>
               </Grid>
 
               {formError && (
                 <Grid item xs={12}>
-                  <Alert severity="error">
+                  <Alert 
+                    severity="error"
+                    sx={{
+                      '& .MuiAlert-icon': {
+                        color: '#000000'
+                      },
+                      '& .MuiAlert-message': {
+                        color: '#000000'
+                      },
+                      bgcolor: '#f5f5f5',
+                      border: '1px solid #000000'
+                    }}
+                  >
                     {formError}
                   </Alert>
                 </Grid>
@@ -197,17 +204,21 @@ const PaymentForm = ({ handleNext }) => {
                   disabled={isSubmitting}
                   sx={{
                     py: 1.5,
-                    bgcolor: 'black',
-                    color: 'white',
-                    '&:hover': { bgcolor: 'grey.900' },
+                    bgcolor: '#000000',
+                    color: '#ffffff',
+                    '&:hover': { bgcolor: '#333333' },
                     textTransform: 'none',
-                    fontSize: '1rem'
+                    fontSize: '1rem',
+                    '&.Mui-disabled': {
+                      bgcolor: '#cccccc',
+                      color: '#666666'
+                    }
                   }}
                 >
                   {isSubmitting ? (
                     <CircularProgress size={24} color="inherit" />
                   ) : (
-                    "Confirm Payment"
+                    "Pay Now with SSLCommerz"
                   )}
                 </Button>
               </Grid>
@@ -218,33 +229,46 @@ const PaymentForm = ({ handleNext }) => {
 
       <Grid item xs={12} md={4}>
         <Paper elevation={0} className="border p-5" sx={{
-          borderColor: 'grey.300',
-          bgcolor: 'background.paper',
+          borderColor: '#000000',
+          bgcolor: '#ffffff',
           borderRadius: 2
         }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: '#000000' }}>
             Order Summary
           </Typography>
-          <Divider sx={{ mb: 2 }} />
+          <Divider sx={{ mb: 2, bgcolor: '#000000' }} />
 
           <Box sx={{ mb: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography color="text.secondary">
+              <Typography color="#000000">
                 Total Items
               </Typography>
-              <Typography>{order.order?.totalItem}</Typography>
+              <Typography color="#000000">{order.order?.totalItem}</Typography>
             </Box>
             
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography color="text.secondary">Total Amount</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              <Typography color="#000000">Total Amount</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#000000' }}>
                 Tk. {order.order?.totalDiscountedPrice}
               </Typography>
             </Box>
           </Box>
 
-          <Alert severity="info" sx={{ mt: 2 }}>
-            Please complete the payment using your selected mobile banking app and provide the transaction details.
+          <Alert 
+            severity="info" 
+            sx={{ 
+              mt: 2,
+              '& .MuiAlert-icon': {
+                color: '#000000'
+              },
+              '& .MuiAlert-message': {
+                color: '#000000'
+              },
+              bgcolor: '#f5f5f5',
+              border: '1px solid #000000'
+            }}
+          >
+            You will be redirected to SSLCommerz secure payment gateway to complete your payment.
           </Alert>
         </Paper>
       </Grid>

@@ -11,75 +11,116 @@ import {
   import axios from 'axios';
   
   export const createPayment = (reqData) => async (dispatch) => {
-    console.log("Creating payment with data:", reqData);
+    dispatch({ type: CREATE_PAYMENT_REQUEST });
+    
     try {
-      dispatch({
-        type: CREATE_PAYMENT_REQUEST,
-      });
+      const { orderId, jwt } = reqData;
+      
+      // Validate required fields
+      if (!orderId) {
+        const error = "Order ID is required";
+        dispatch({
+          type: CREATE_PAYMENT_FAILURE,
+          payload: error,
+        });
+        return { error };
+      }
+      
       const config = {
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${reqData.jwt}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
         },
       };
-  
-      // Remove jwt from the request body
-      const paymentData = {
-        paymentMethod: reqData.paymentMethod,
-        transactionId: reqData.transactionId,
-        paymentPhoneNumber: reqData.paymentPhoneNumber
-      };
-  
-      const { data } = await axios.post(`${API_BASE_URL}/api/payments/${reqData.orderId}`, paymentData, config);
-  console.log("datta",data)
-  if(data.payment_link_url){
-    window.location.href=data.payment_link_url;
-  }
-      dispatch({
-        type: CREATE_PAYMENT_SUCCESS,
-        payload: data,
-      });
-
-      return data;
-    } catch (error) {
-      console.error("Payment error:", error.response?.data || error.message);
       
-      const errorMessage = error.response?.data?.message 
-          || error.response?.data?.error 
-          || error.message 
-          || 'Payment failed';
-
+      // Create payment data object with SSLCommerz as the payment method
+      const paymentData = {
+        orderId,
+        paymentMethod: "SSLCommerz",
+        amount: reqData.amount,
+        transactionId: reqData.transactionId,
+        paymentPhoneNumber: reqData.paymentPhoneNumber,
+        customerName: reqData.customerName,
+        customerEmail: reqData.customerEmail
+      };
+      
+      console.log("Sending payment request:", paymentData);
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/api/payments/${orderId}`,
+        paymentData,
+        config
+      );
+      
+      const data = response.data;
+      
+      if (data.success) {
+        dispatch({
+          type: CREATE_PAYMENT_SUCCESS,
+          payload: data,
+        });
+        
+        // For SSLCommerz, redirect to payment gateway
+        if (data.payment_link_url) {
+          window.location.href = data.payment_link_url;
+        }
+        
+        return data;
+      } else {
+        throw new Error(data.message || "Payment creation failed");
+      }
+    } catch (error) {
+      console.error("Payment creation error:", error);
+      
+      const errorMessage = error.response?.data?.message || error.message || "Payment creation failed";
+      
       dispatch({
         type: CREATE_PAYMENT_FAILURE,
-        payload: errorMessage
+        payload: errorMessage,
       });
-
-      throw new Error(errorMessage);
+      
+      return { error: errorMessage };
     }
   };
   
-
-
-
-  export const updatePayment = (reqData) => {
-    return async (dispatch) => {
-      console.log("update payment reqData ",reqData)
-      dispatch(updatePaymentRequest());
-      try {
-        const config = {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${reqData.jwt}`,
-          },
-        };
-        const response = await axios.get(`${API_BASE_URL}/api/payments?payment_id=${reqData.paymentId}&order_id=${reqData.orderId}`,config);
-        console.log("updated data ---- ",response.data)
-        dispatch(updatePaymentSuccess(response.data));
-      } catch (error) {
-        dispatch(updatePaymentFailure(error.message));
-        console.log("catch error ",error)
+  export const updatePayment = (reqData) => async (dispatch) => {
+    dispatch({ type: UPDATE_PAYMENT_REQUEST });
+    
+    try {
+      const { paymentId, jwt } = reqData;
+      
+      const config = {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+      };
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/api/payments/${paymentId}`,
+        config
+      );
+      
+      const data = response.data;
+      
+      if (data.success) {
+        dispatch({
+          type: UPDATE_PAYMENT_SUCCESS,
+          payload: data,
+        });
+        
+        return data;
       }
-    };
+    } catch (error) {
+      console.error("Payment update error:", error);
+      
+      dispatch({
+        type: UPDATE_PAYMENT_FAILURE,
+        payload: error.response?.data?.message || "Payment update failed",
+      });
+      
+      return { error: error.response?.data?.message || "Payment update failed" };
+    }
   };
 
 export const updatePaymentRequest = () => {

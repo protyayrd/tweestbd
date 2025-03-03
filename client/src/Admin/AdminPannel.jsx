@@ -35,7 +35,6 @@ import { deepPurple } from "@mui/material/colors";
 import FeaturedCategories from './componets/Categories/FeaturedCategories';
 import ProductDetails from "./componets/Products/ProductDetails";
 import PromoCodeList from "./componets/PromoCode/PromoCodeList";
-import EdushopCategoryManagement from './componets/Categories/EdushopCategoryManagement';
 
 const drawerWidth = 240;
 
@@ -43,7 +42,6 @@ const menu = [
   {name:"Dashboard",path:"/admin"},
   {name:"Products",path:"/admin/products"},
   {name:"Categories",path:"/admin/categories"},
-  {name:"Edushop Categories",path:"/admin/edushop-categories"},
   {name:"Customers",path:"/admin/customers"},
   {name:"Orders",path:"/admin/orders"},
   {name:"Promo Codes",path:"/admin/promo-codes"},
@@ -193,7 +191,6 @@ export default function AdminPannel() {
             <Route path="/product/edit/:productId" element={<UpdateProductForm/>}></Route>
             <Route path="/products" element={<ProductsTable/>}></Route>
             <Route path="/categories" element={<CategoryManagement/>}></Route>
-            <Route path="/edushop-categories" element={<EdushopCategoryManagement/>}></Route>
             <Route path="/orders" element={<OrdersTable/>}></Route>
             <Route path="/customers" element={<Customers/>}></Route>
             <Route path="/demo" element={<DemoAdmin />}></Route>

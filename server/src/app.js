@@ -18,7 +18,6 @@ const paymentRoutes = require('./routes/payment.routes');
 const reviewRoutes = require('./routes/review.routes');
 const ratingRoutes = require('./routes/rating.routes');
 const promoCodeRoutes = require('./routes/promoCode.routes');
-const edushopRoutes = require('./routes/edushop.routes');
 
 const app = express();
 
@@ -32,8 +31,7 @@ app.use(express.json());
 // Create uploads directories if they don't exist
 const uploadDirs = [
   path.join(__dirname, '../public/uploads/categories'),
-  path.join(__dirname, '../public/uploads/products'),
-  path.join(__dirname, '../public/uploads/edushop')
+  path.join(__dirname, '../public/uploads/products')
 ];
 
 uploadDirs.forEach(dir => {
@@ -47,7 +45,14 @@ uploadDirs.forEach(dir => {
 app.use((req, res, next) => {
   console.log('Request URL:', req.url);
   console.log('Request Method:', req.method);
-  console.log('Request Headers:', req.headers);
+  
+  // Don't log authentication headers to avoid confusion
+  const headers = { ...req.headers };
+  if (headers.authorization) {
+    headers.authorization = 'Bearer [REDACTED]';
+  }
+  console.log('Request Headers:', headers);
+  
   console.log('Request Body:', req.body);
   next();
 });
@@ -121,8 +126,6 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/promo-codes', promoCodeRoutes);
-console.log('Mounting Edushop routes at /api/edushop');
-app.use('/api/edushop', edushopRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

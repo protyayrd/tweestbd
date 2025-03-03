@@ -74,9 +74,9 @@ import {
             return {
               ...state,
               loading: false,
-              orders: action.payload,
+              orders: action.payload.orders || [],
               error: null,
-              stats: action.payload.stats
+              stats: action.payload.stats || null
             };
           case GET_ORDER_HISTORY_FAILURE:
             return {

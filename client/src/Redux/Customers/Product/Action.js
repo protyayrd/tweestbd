@@ -30,15 +30,34 @@ export const findProducts = (reqData) => async (dispatch) => {
     // Build query parameters
     const params = new URLSearchParams();
     
-    // Add all possible filter parameters
-    if (reqData.category) params.append("category", reqData.category);
+    // Add category and subcategories parameters
+    if (reqData.category) {
+      params.append("category", reqData.category);
+    }
+    if (reqData.subcategories && Array.isArray(reqData.subcategories)) {
+      reqData.subcategories.forEach(subcat => {
+        if (subcat) params.append("subcategories", subcat);
+      });
+    }
+    
+    // Add pagination parameters
     if (reqData.pageNumber) params.append("pageNumber", reqData.pageNumber);
     if (reqData.pageSize) params.append("pageSize", reqData.pageSize);
+    
+    // Add sorting parameter
     if (reqData.sort) params.append("sort", reqData.sort);
+    
+    // Add filter parameters
     if (reqData.minPrice) params.append("minPrice", reqData.minPrice);
     if (reqData.maxPrice) params.append("maxPrice", reqData.maxPrice);
     if (reqData.colors && reqData.colors.length > 0) params.append("colors", reqData.colors.join(','));
     if (reqData.sizes && reqData.sizes.length > 0) params.append("sizes", reqData.sizes.join(','));
+    if (reqData.minDiscount) params.append("minDiscount", reqData.minDiscount);
+    if (reqData.rating) params.append("rating", reqData.rating);
+    if (reqData.stock) params.append("stock", reqData.stock);
+    if (reqData.isNewArrival) params.append("isNewArrival", reqData.isNewArrival);
+    if (reqData.isFeatured) params.append("isFeatured", reqData.isFeatured);
+    if (reqData.search) params.append("search", reqData.search);
 
     console.log("Filter params:", Object.fromEntries(params.entries()));
 
@@ -49,7 +68,6 @@ export const findProducts = (reqData) => async (dispatch) => {
     console.log("Products API response:", response.data);
     
     if (!response.data) {
-      console.error("Invalid API response:", response);
       throw new Error('No data received from API');
     }
 
@@ -69,23 +87,11 @@ export const findProducts = (reqData) => async (dispatch) => {
 
     return response.data;
   } catch (error) {
-    console.error("Error fetching products:", {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      config: error.config
-    });
-    
-    const errorMessage = error.response?.data?.message 
-      || error.response?.data?.error 
-      || error.message 
-      || 'Failed to fetch products';
-      
+    console.error("Error fetching products:", error);
     dispatch({
       type: FIND_PRODUCTS_BY_CATEGORY_FAILURE,
-      payload: errorMessage
+      payload: error.response?.data?.message || error.message
     });
-
     throw error;
   }
 };

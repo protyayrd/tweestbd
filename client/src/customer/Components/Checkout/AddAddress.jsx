@@ -29,14 +29,14 @@ const baseURL = "https://bdapis.com/api/v1.2";
 const commonTextFieldStyles = {
   '& .MuiOutlinedInput-root': { 
     '&.Mui-focused fieldset': { 
-      borderColor: 'black' 
+      borderColor: '#000000' 
     },
     '&:hover fieldset': {
-      borderColor: 'grey.400'
+      borderColor: '#000000'
     }
   },
   '& .MuiInputLabel-root.Mui-focused': {
-    color: 'black'
+    color: '#000000'
   }
 };
 
@@ -194,7 +194,15 @@ export default function AddDeliveryAddressForm({ handleNext }) {
       })),
       totalPrice: cart.totalPrice,
       totalDiscountedPrice: cart.totalDiscountedPrice,
-      discounte: cart.discounte,
+      discount: cart.discount,
+      productDiscount: cart.discount - (cart.promoCodeDiscount || 0),
+      promoCodeDiscount: cart.promoCodeDiscount || 0,
+      promoDetails: cart.promoDetails || {
+        code: null,
+        discountType: null,
+        discountAmount: 0,
+        maxDiscountAmount: null
+      },
       totalItem: cart.totalItem,
     };
 
@@ -218,71 +226,11 @@ export default function AddDeliveryAddressForm({ handleNext }) {
     }
   };
 
-  const handleCreateOrder = async (item) => {
-    setLoading(true);
-
-    if (!cart.cartItems || cart.cartItems.length === 0) {
-      setError("Your cart is empty. Please add items to cart first.");
-      setLoading(false);
-      return;
-    }
-
-    // Validate saved address data
-    const addressData = {
-      firstName: item.firstName || "",
-      lastName: item.lastName || "",
-      streetAddress: item.streetAddress || "",
-      division: item.division || item.state || "",
-      district: item.district || item.city || "",
-      upazilla: item.upazilla || item.area || "",
-      zipCode: item.zipCode || item.zip || "",
-      mobile: item.mobile || item.phoneNumber || "",
-    };
-
-    // Validate that no field is undefined or empty
-    const requiredFields = Object.entries(addressData);
-    const emptyFields = requiredFields.filter(([key, value]) => !value || value === "undefined");
-    
-    if (emptyFields.length > 0) {
-      setError(`Invalid saved address. Missing fields: ${emptyFields.map(([key]) => key).join(', ')}`);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const orderData = {
-        address: addressData,
-        orderItems: cart.cartItems.map(item => ({
-          product: item.product?._id || item.productId,
-          quantity: item.quantity,
-          price: item.product?.price || item.price,
-          discountedPrice: item.product?.discountedPrice || item.discountedPrice,
-          size: item.size,
-          color: item.color || "default"
-        })),
-        totalPrice: cart.totalPrice,
-        totalDiscountedPrice: cart.totalDiscountedPrice,
-        discounte: cart.discounte,
-        totalItem: cart.totalItem,
-      };
-      
-      console.log("Submitting saved address order data:", orderData);
-      const response = await dispatch(createOrder({ ...orderData, jwt, navigate }));
-      if (response?.payload?._id) {
-        handleNext();
-      } else {
-        setError("Failed to create order. Please try again.");
-      }
-    } catch (error) {
-      console.error("Order creation error:", error);
-      const errorMessage = typeof error.response?.data === 'string' 
-        ? error.response.data 
-        : error.response?.data?.message 
-        || "Failed to create order. Please try again.";
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+  const handleSelectAddress = (item) => {
+    // Store the selected address in local storage or state for use in the next step
+    localStorage.setItem("selectedAddress", JSON.stringify(item));
+    // Move to the next step
+    handleNext();
   };
 
   const toggleManualInput = () => {
@@ -298,11 +246,11 @@ export default function AddDeliveryAddressForm({ handleNext }) {
     <Grid container spacing={4}>
       <Grid item xs={12} lg={5}>
         <Paper elevation={0} className="border h-[30.5rem] overflow-y-scroll" sx={{
-          borderColor: 'grey.300',
-          bgcolor: 'background.paper',
+          borderColor: '#000000',
+          bgcolor: '#ffffff',
           borderRadius: 2
         }}>
-          <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'grey.200', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: '#000000', fontWeight: 600, color: '#000000' }}>
             Saved Addresses
           </Typography>
           {auth.user?.addresses.map((item) => (
@@ -310,23 +258,24 @@ export default function AddDeliveryAddressForm({ handleNext }) {
               key={item.id}
               onClick={() => setSelectedAdress(item)}
               className="p-5 py-7 border-b cursor-pointer transition-all duration-200 hover:bg-gray-50"
+              style={{ borderColor: '#000000' }}
             >
               <AddressCard address={item} />
               {selectedAddress?.id === item.id && (
                 <Button
                   sx={{ 
                     mt: 2,
-                    bgcolor: 'black',
-                    color: 'white',
+                    bgcolor: '#000000',
+                    color: '#ffffff',
                     '&:hover': {
-                      bgcolor: 'grey.900',
+                      bgcolor: '#333333',
                     },
                     textTransform: 'none',
                     borderRadius: 2
                   }}
                   size="large"
                   variant="contained"
-                  onClick={() => handleCreateOrder(item)}
+                  onClick={() => handleSelectAddress(item)}
                 >
                   Deliver to this address
                 </Button>
@@ -337,12 +286,12 @@ export default function AddDeliveryAddressForm({ handleNext }) {
       </Grid>
       <Grid item xs={12} lg={7}>
         <Paper elevation={0} className="border p-5" sx={{
-          borderColor: 'grey.300',
-          bgcolor: 'background.paper',
+          borderColor: '#000000',
+          bgcolor: '#ffffff',
           borderRadius: 2
         }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#000000' }}>
               Add New Delivery Address
             </Typography>
             <FormControlLabel
@@ -352,16 +301,16 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                   onChange={toggleManualInput}
                   sx={{
                     '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: 'black',
+                      color: '#000000',
                       '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
                     },
                     '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: 'black',
+                      backgroundColor: '#000000',
                     },
                   }}
                 />
               }
-              label={<Typography variant="body2">Manual Input</Typography>}
+              label={<Typography variant="body2" color="#000000">Manual Input</Typography>}
             />
           </Box>
           <form onSubmit={handleSubmit}>
@@ -375,6 +324,9 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                   fullWidth
                   autoComplete="given-name"
                   sx={commonTextFieldStyles}
+                  InputLabelProps={{
+                    style: { color: '#000000' }
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -386,12 +338,15 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                   fullWidth
                   autoComplete="given-name"
                   sx={commonTextFieldStyles}
+                  InputLabelProps={{
+                    style: { color: '#000000' }
+                  }}
                 />
               </Grid>
               
               <Grid item xs={12}>
-                <Divider sx={{ my: 1 }}>
-                  <Typography variant="body2" color="text.secondary">
+                <Divider sx={{ my: 1, bgcolor: '#000000' }}>
+                  <Typography variant="body2" color="#000000">
                     Address Details
                   </Typography>
                 </Divider>
@@ -409,7 +364,10 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                   placeholder="House/Building number, Street name, Area"
                   sx={commonTextFieldStyles}
                   InputProps={{
-                    startAdornment: <HomeIcon sx={{ mr: 1, color: 'grey.500' }} />,
+                    startAdornment: <HomeIcon sx={{ mr: 1, color: '#000000' }} />,
+                  }}
+                  InputLabelProps={{
+                    style: { color: '#000000' }
                   }}
                 />
               </Grid>
@@ -428,9 +386,23 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                       onChange={(e) => setSelectedDivision(e.target.value)}
                       sx={commonTextFieldStyles}
                       InputProps={{
-                        startAdornment: <LocationOnIcon sx={{ mr: 1, color: 'grey.500' }} />,
+                        startAdornment: <LocationOnIcon sx={{ mr: 1, color: '#000000' }} />,
+                      }}
+                      InputLabelProps={{
+                        style: { color: '#000000' }
                       }}
                       disabled={loading}
+                      SelectProps={{
+                        MenuProps: {
+                          PaperProps: {
+                            sx: {
+                              '& .MuiMenuItem-root': {
+                                color: '#000000'
+                              }
+                            }
+                          }
+                        }
+                      }}
                     >
                       {divisions.map((division) => (
                         <MenuItem key={division.division} value={division.division}>
@@ -452,6 +424,20 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                       onChange={(e) => setSelectedDistrict(e.target.value)}
                       disabled={!selectedDivision || loading}
                       sx={commonTextFieldStyles}
+                      InputLabelProps={{
+                        style: { color: '#000000' }
+                      }}
+                      SelectProps={{
+                        MenuProps: {
+                          PaperProps: {
+                            sx: {
+                              '& .MuiMenuItem-root': {
+                                color: '#000000'
+                              }
+                            }
+                          }
+                        }
+                      }}
                     >
                       {districts.map((district) => (
                         <MenuItem key={district.district} value={district.district}>
@@ -473,6 +459,20 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                       onChange={(e) => setSelectedUpazilla(e.target.value)}
                       disabled={!selectedDistrict || loading}
                       sx={commonTextFieldStyles}
+                      InputLabelProps={{
+                        style: { color: '#000000' }
+                      }}
+                      SelectProps={{
+                        MenuProps: {
+                          PaperProps: {
+                            sx: {
+                              '& .MuiMenuItem-root': {
+                                color: '#000000'
+                              }
+                            }
+                          }
+                        }
+                      }}
                     >
                       {upazillas.map((upazilla) => (
                         <MenuItem key={upazilla} value={upazilla}>
@@ -493,7 +493,10 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                       fullWidth
                       sx={commonTextFieldStyles}
                       InputProps={{
-                        startAdornment: <LocationOnIcon sx={{ mr: 1, color: 'grey.500' }} />,
+                        startAdornment: <LocationOnIcon sx={{ mr: 1, color: '#000000' }} />,
+                      }}
+                      InputLabelProps={{
+                        style: { color: '#000000' }
                       }}
                     />
                   </Grid>
@@ -505,6 +508,9 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                       label="District"
                       fullWidth
                       sx={commonTextFieldStyles}
+                      InputLabelProps={{
+                        style: { color: '#000000' }
+                      }}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
@@ -515,6 +521,9 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                       label="Upazilla"
                       fullWidth
                       sx={commonTextFieldStyles}
+                      InputLabelProps={{
+                        style: { color: '#000000' }
+                      }}
                     />
                   </Grid>
                 </>
@@ -530,7 +539,13 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
                   sx={commonTextFieldStyles}
+                  InputLabelProps={{
+                    style: { color: '#000000' }
+                  }}
                   helperText={!manualInput && postalCode ? "Auto-filled based on your district" : ""}
+                  FormHelperTextProps={{
+                    style: { color: '#000000' }
+                  }}
                 />
               </Grid>
 
@@ -545,22 +560,25 @@ export default function AddDeliveryAddressForm({ handleNext }) {
                   sx={commonTextFieldStyles}
                   placeholder="e.g., +880 1XXX-XXXXXX"
                   InputProps={{
-                    startAdornment: <PhoneIcon sx={{ mr: 1, color: 'grey.500' }} />,
+                    startAdornment: <PhoneIcon sx={{ mr: 1, color: '#000000' }} />,
+                  }}
+                  InputLabelProps={{
+                    style: { color: '#000000' }
                   }}
                 />
               </Grid>
 
               <Grid item xs={12}>
                 {loading ? (
-                  <CircularProgress sx={{ color: 'black' }} />
+                  <CircularProgress sx={{ color: '#000000' }} />
                 ) : (
                   <Button
                     sx={{
                       padding: ".9rem 1.5rem",
-                      bgcolor: 'black',
-                      color: 'white',
+                      bgcolor: '#000000',
+                      color: '#ffffff',
                       '&:hover': {
-                        bgcolor: 'grey.900',
+                        bgcolor: '#333333',
                       },
                       borderRadius: 2,
                       textTransform: 'none',
@@ -589,7 +607,15 @@ export default function AddDeliveryAddressForm({ handleNext }) {
         <Alert 
           onClose={() => setError("")} 
           severity={apiError ? "warning" : "error"} 
-          sx={{ width: '100%' }}
+          sx={{ 
+            width: '100%',
+            bgcolor: '#f5f5f5',
+            color: '#000000',
+            border: '1px solid #000000',
+            '& .MuiAlert-icon': {
+              color: '#000000'
+            }
+          }}
         >
           {error}
         </Alert>

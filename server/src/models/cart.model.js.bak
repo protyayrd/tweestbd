@@ -46,22 +46,9 @@ const cartSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
-  // Store promoDetails as a simple object without validation
-  promoDetailsCode: {
-    type: String,
-    default: null
-  },
-  promoDetailsDiscountType: {
-    type: String,
-    default: 'FIXED'
-  },
-  promoDetailsDiscountAmount: {
-    type: Number,
-    default: 0
-  },
-  promoDetailsMaxDiscountAmount: {
-    type: Number,
-    default: null
+  promoDetails: {
+    type: Object,
+    default: {}
   }
 }, { 
   timestamps: true,
@@ -80,19 +67,13 @@ const cartSchema = new mongoose.Schema({
       // Ensure promoCodeDiscount is always a number
       ret.promoCodeDiscount = ret.promoCodeDiscount || 0;
       
-      // Construct promoDetails from individual fields
+      // Ensure promoDetails has valid values
       ret.promoDetails = {
-        code: ret.promoDetailsCode,
-        discountType: ret.promoDetailsDiscountType || 'FIXED',
-        discountAmount: ret.promoDetailsDiscountAmount || 0,
-        maxDiscountAmount: ret.promoDetailsMaxDiscountAmount
+        code: undefined,
+        discountType: 'FIXED',
+        discountAmount: 0,
+        maxDiscountAmount: undefined
       };
-      
-      // Remove individual fields from response
-      delete ret.promoDetailsCode;
-      delete ret.promoDetailsDiscountType;
-      delete ret.promoDetailsDiscountAmount;
-      delete ret.promoDetailsMaxDiscountAmount;
       
       // Remove any 'discounte' field if it exists
       delete ret.discounte;
@@ -150,19 +131,23 @@ async function calculateTotals(cart) {
 
   // Calculate promo discount if applicable
   let promoDiscount = 0;
-  let promoDetailsCode = null;
-  let promoDetailsDiscountType = 'FIXED';
-  let promoDetailsDiscountAmount = 0;
-  let promoDetailsMaxDiscountAmount = null;
+  let promoDetails = {
+    code: undefined,
+    discountType: 'FIXED', // Always use 'FIXED' as a valid enum value
+    discountAmount: 0,
+    maxDiscountAmount: undefined
+  };
 
   if (cart.promoCode) {
     // Use the already populated promoCode
     const promoCode = cart.promoCode;
     if (promoCode) {
-      promoDetailsCode = promoCode.code;
-      promoDetailsDiscountType = 'FIXED'; // Always use 'FIXED' regardless of what's in the database
-      promoDetailsDiscountAmount = promoCode.discountAmount || 0;
-      promoDetailsMaxDiscountAmount = promoCode.maxDiscountAmount;
+      promoDetails = {
+        code: promoCode.code || undefined,
+        discountType: 'FIXED', // Always use 'FIXED' regardless of what's in the database
+        discountAmount: promoCode.discountAmount || 0,
+        maxDiscountAmount: promoCode.maxDiscountAmount || undefined
+      };
 
       // Calculate promo discount based on the discounted price (after product discounts)
       if (promoCode.discountType === 'PERCENTAGE') {
@@ -187,10 +172,7 @@ async function calculateTotals(cart) {
     discount: productDiscount,  // Product discount only
     totalItem: totalItems,
     promoCodeDiscount: promoDiscount,
-    promoDetailsCode,
-    promoDetailsDiscountType,
-    promoDetailsDiscountAmount,
-    promoDetailsMaxDiscountAmount
+    promoDetails
   };
 }
 
@@ -208,17 +190,16 @@ cartSchema.pre('save', async function(next) {
       
       // Only update promo details if we have a promo code
       if (this.promoCode) {
-        this.promoDetailsCode = totals.promoDetailsCode;
-        this.promoDetailsDiscountType = totals.promoDetailsDiscountType;
-        this.promoDetailsDiscountAmount = totals.promoDetailsDiscountAmount;
-        this.promoDetailsMaxDiscountAmount = totals.promoDetailsMaxDiscountAmount;
+        this.promoDetails = totals.promoDetails;
       } else {
         // Reset promo code values if no promo code is applied
         this.promoCodeDiscount = 0;
-        this.promoDetailsCode = null;
-        this.promoDetailsDiscountType = 'FIXED';
-        this.promoDetailsDiscountAmount = 0;
-        this.promoDetailsMaxDiscountAmount = null;
+        this.promoDetails = {
+          code: undefined,
+          discountType: 'FIXED', // Always use 'FIXED' as a valid enum value
+          discountAmount: 0,
+          maxDiscountAmount: undefined
+        };
       }
     } else {
       // Reset all values for empty cart
@@ -228,10 +209,12 @@ cartSchema.pre('save', async function(next) {
       this.totalItem = 0;
       this.promoCode = undefined;
       this.promoCodeDiscount = 0;
-      this.promoDetailsCode = null;
-      this.promoDetailsDiscountType = 'FIXED';
-      this.promoDetailsDiscountAmount = 0;
-      this.promoDetailsMaxDiscountAmount = null;
+      this.promoDetails = {
+        code: undefined,
+        discountType: 'FIXED', // Always use 'FIXED' as a valid enum value
+        discountAmount: 0,
+        maxDiscountAmount: undefined
+      };
     }
     next();
   } catch (error) {
@@ -253,15 +236,14 @@ cartSchema.methods.recalculateTotals = async function() {
     
     // Ensure promoDetails has a valid discountType
     if (this.promoCode) {
-      this.promoDetailsCode = totals.promoDetailsCode;
-      this.promoDetailsDiscountType = totals.promoDetailsDiscountType;
-      this.promoDetailsDiscountAmount = totals.promoDetailsDiscountAmount;
-      this.promoDetailsMaxDiscountAmount = totals.promoDetailsMaxDiscountAmount;
+      this.promoDetails = totals.promoDetails;
     } else {
-      this.promoDetailsCode = null;
-      this.promoDetailsDiscountType = 'FIXED';
-      this.promoDetailsDiscountAmount = 0;
-      this.promoDetailsMaxDiscountAmount = null;
+      this.promoDetails = {
+        code: undefined,
+        discountType: 'FIXED', // Always use 'FIXED' as a valid enum value
+        discountAmount: 0,
+        maxDiscountAmount: undefined
+      };
     }
     
     // Save with validation disabled
@@ -274,4 +256,4 @@ cartSchema.methods.recalculateTotals = async function() {
 
 const Cart = mongoose.model('carts', cartSchema);
 
-module.exports = Cart; 
+module.exports = Cart;

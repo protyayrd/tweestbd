@@ -29,6 +29,16 @@ const cartItemSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'users',
     required: true,
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  discountedPrice: {
+    type: Number,
+    required: true,
+    min: 0
   }
 }, { 
   timestamps: true,
@@ -36,70 +46,89 @@ const cartItemSchema = new mongoose.Schema({
     virtuals: true,
     getters: true,
     transform: function(doc, ret) {
+      const originalPrice = ret.price || 0;
+      const baseDiscountedPrice = ret.discountedPrice || originalPrice;
+      const quantity = ret.quantity || 0;
+      
+      // Calculate product discount
+      const totalOriginalPrice = originalPrice * quantity;
+      const totalBaseDiscountedPrice = baseDiscountedPrice * quantity;
+      const productDiscount = totalOriginalPrice - totalBaseDiscountedPrice;
+      
+      // Get promo discount from cart
+      const promoDiscount = doc.cart?.promoCodeDiscount || 0;
+      const cartTotalValue = doc.cart?.totalDiscountedPrice || totalBaseDiscountedPrice;
+      
+      // Calculate this item's share of promo discount based on its value ratio
+      const itemValueRatio = totalBaseDiscountedPrice / cartTotalValue;
+      const itemPromoDiscount = promoDiscount * itemValueRatio;
+      
+      // Calculate final price after all discounts
+      const finalDiscountedPrice = totalBaseDiscountedPrice - itemPromoDiscount;
+      
       return {
         _id: ret._id,
-        cart: ret.cart,
+        cart: {
+          promoCodeDiscount: promoDiscount,
+          promoDetails: doc.cart?.promoDetails
+        },
         product: ret.product,
         size: ret.size,
-        color: doc.color || ret.color,
+        color: ret.color,
         quantity: ret.quantity,
         userId: ret.userId,
-        createdAt: ret.createdAt,
-        updatedAt: ret.updatedAt,
-        totalPrice: ret.totalPrice,
-        totalDiscountedPrice: ret.totalDiscountedPrice,
-        discount: ret.discount
+        price: originalPrice,
+        discountedPrice: baseDiscountedPrice,
+        totalPrice: totalOriginalPrice,
+        totalDiscountedPrice: finalDiscountedPrice,
+        productDiscount,
+        promoDiscount: itemPromoDiscount,
+        totalDiscount: productDiscount + itemPromoDiscount,
+        discountPercentage: ((productDiscount + itemPromoDiscount) / totalOriginalPrice * 100).toFixed(2)
       };
     }
   },
-  toObject: { 
-    virtuals: true,
-    getters: true,
-    transform: function(doc, ret) {
-      return {
-        _id: ret._id,
-        cart: ret.cart,
-        product: ret.product,
-        size: ret.size,
-        color: doc.color || ret.color,
-        quantity: ret.quantity,
-        userId: ret.userId,
-        createdAt: ret.createdAt,
-        updatedAt: ret.updatedAt,
-        totalPrice: ret.totalPrice,
-        totalDiscountedPrice: ret.totalDiscountedPrice,
-        discount: ret.discount
-      };
-    }
-  }
+  toObject: { virtuals: true }
 });
 
-// Add virtual fields for price calculations
+// Virtual fields for price calculations
 cartItemSchema.virtual('totalPrice').get(function() {
-  if (this.product && typeof this.product === 'object') {
-    return this.product.price * this.quantity;
-  }
-  return 0;
+  return this.price * this.quantity;
 });
 
 cartItemSchema.virtual('totalDiscountedPrice').get(function() {
-  if (this.product && typeof this.product === 'object') {
-    return this.product.discountedPrice * this.quantity;
-  }
-  return 0;
+  return this.discountedPrice * this.quantity;
 });
 
-cartItemSchema.virtual('discount').get(function() {
+cartItemSchema.virtual('productDiscount').get(function() {
   return this.totalPrice - this.totalDiscountedPrice;
 });
 
-// Add a pre-save middleware to ensure color is saved
-cartItemSchema.pre('save', function(next) {
-  if (this.isModified('color')) {
-    // Make sure color is saved as a string
-    this.color = String(this.color);
+cartItemSchema.virtual('discountPercentage').get(function() {
+  if (this.totalPrice === 0) return 0;
+  return ((this.productDiscount / this.totalPrice) * 100).toFixed(2);
+});
+
+// Pre-save middleware to validate prices
+cartItemSchema.pre('save', async function(next) {
+  try {
+    if (!this.price || !this.discountedPrice) {
+      const product = await this.model('products').findById(this.product);
+      if (!product) {
+        throw new Error('Product not found');
+      }
+      this.price = product.price;
+      this.discountedPrice = product.discountedPrice || product.price;
+    }
+
+    if (this.discountedPrice > this.price) {
+      this.discountedPrice = this.price;
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 const CartItem = mongoose.model('cartItems', cartItemSchema);

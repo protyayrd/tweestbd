@@ -7,7 +7,9 @@ import {
   IconButton, 
   Typography, 
   Paper,
-  CircularProgress
+  CircularProgress,
+  Divider,
+  Stack
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
@@ -18,23 +20,12 @@ const CartItem = ({ item, showButton }) => {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
-
-  // Get the image URL for the selected color
-  const getItemImage = () => {
-    if (item?.product?.colors && item?.color) {
-      const colorData = item.product.colors.find(c => c.name === item.color);
-      if (colorData && colorData.images && colorData.images.length > 0) {
-        return getImageUrl(colorData.images[0]);
-      }
-    }
-    // Fallback to product's main image if color image not found
-    return item?.product?.imageUrl ? getImageUrl(item.product.imageUrl) : "";
-  };
+  const [imgError, setImgError] = useState(false);
 
   const handleRemoveItemFromCart = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      await dispatch(removeCartItem(item?._id));
+      await dispatch(removeCartItem(item._id));
     } catch (error) {
       console.error('Error removing item:', error);
     } finally {
@@ -42,13 +33,16 @@ const CartItem = ({ item, showButton }) => {
     }
   };
 
-  const handleUpdateCartItem = async (num) => {
+  const handleUpdateCartItem = async (change) => {
+    const newQuantity = item.quantity + change;
+    if (newQuantity < 1) return;
+
+    setUpdateLoading(true);
     try {
-      setUpdateLoading(true);
-      const newQuantity = item.quantity + num;
-      if (newQuantity > 0) {
-        await dispatch(updateCartItem(item?._id, { quantity: newQuantity }));
-      }
+      await dispatch(updateCartItem({
+        cartItemId: item._id,
+        data: { quantity: newQuantity }
+      }));
     } catch (error) {
       console.error('Error updating quantity:', error);
     } finally {
@@ -56,145 +50,281 @@ const CartItem = ({ item, showButton }) => {
     }
   };
 
-  return (
-    <Box>
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          border: '1px solid #e0e0e0',
-          '&:hover': {
-            borderColor: '#bdbdbd'
-          }
-        }}
-      >
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Box 
-            sx={{ 
-              width: { xs: 80, sm: 120 }, 
-              height: { xs: 80, sm: 120 },
-              flexShrink: 0
-            }}
-          >
-            <img
-              src={getItemImage()}
-              alt={item?.product?.title}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                borderRadius: '4px'
-              }}
-            />
-          </Box>
+  // Get product data
+  const product = item.product || {};
+  const imageUrl = product.imageUrl ? getImageUrl(product.imageUrl) : null;
+  const fallbackImage = '/images/placeholder.png';
+  
+  // Calculate prices and discounts
+  const originalPrice = product.price || 0;
+  const discountedPrice = product.discountedPrice || originalPrice;
+  const quantity = item.quantity || 1;
+  const totalOriginalPrice = originalPrice * quantity;
+  const totalDiscountedPrice = discountedPrice * quantity;
+  const totalSavings = totalOriginalPrice - totalDiscountedPrice;
+  const discountPercentage = originalPrice > 0 
+    ? Math.round(((originalPrice - discountedPrice) / originalPrice) * 100) 
+    : 0;
 
-          <Box sx={{ flex: 1 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+  // These values should only be used for the mobile view detailed breakdown
+  const productDiscount = totalOriginalPrice - totalDiscountedPrice;
+  
+  // Check if there's an actual promo discount applied to this item
+  const promoDiscount = item.promoDiscount && item.promoDiscount > 0 ? item.promoDiscount : 0;
+  const totalDiscount = productDiscount + promoDiscount;
+  const finalPrice = totalDiscountedPrice - promoDiscount;
+
+  // Get promo code details
+  const promoDetails = item.cart?.promoDetails;
+  const hasPromoCode = promoDetails?.code && promoDiscount > 0;
+
+  console.log('Rendering cart item:', {
+    id: item._id,
+    color: item.color,
+    imageUrl,
+    originalPrice,
+    discountedPrice,
+    totalOriginalPrice,
+    totalDiscountedPrice,
+    discountPercentage
+  });
+
+  return (
+    <Paper
+      elevation={0}
+      variant="outlined"
+      sx={{
+        p: 2,
+        mb: 2,
+        borderRadius: 2,
+        transition: 'all 0.3s ease',
+        '&:hover': {
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          borderColor: 'divider'
+        },
+        bgcolor: 'background.paper'
+      }}
+    >
+      <Stack 
+        direction={{ xs: 'column', sm: 'row' }} 
+        spacing={2}
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+      >
+        {/* Product Image */}
+        <Box 
+          sx={{ 
+            width: { xs: '100%', sm: 120 }, 
+            height: { xs: 200, sm: 120 },
+            position: 'relative',
+            borderRadius: 2,
+            overflow: 'hidden'
+          }}
+        >
+          <Box
+            component="img"
+            src={imgError || !imageUrl ? fallbackImage : imageUrl}
+            alt={product.title || 'Product image'}
+            sx={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
+            }}
+            onError={() => setImgError(true)}
+          />
+        </Box>
+
+        {/* Product Details */}
+        <Box sx={{ flex: 1 }}>
+          <Stack spacing={2}>
+            {/* Title and Remove Button */}
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
               <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 1 }}>
-                  {item?.product?.title}
+                <Typography variant="h6" sx={{ fontWeight: 500, mb: 1 }}>
+                  {product.title}
                 </Typography>
-                
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <Stack direction="row" spacing={2}>
                   <Typography variant="body2" color="text.secondary">
-                    Size: {item?.size}
+                    Size: {item.size}
                   </Typography>
-                  {item?.color && (
+                  {item.color && (
                     <Typography variant="body2" color="text.secondary">
                       Color: {item.color}
                     </Typography>
                   )}
-                </Box>
+                </Stack>
               </Box>
-
               {showButton && (
                 <Button
                   startIcon={loading ? <CircularProgress size={20} /> : <DeleteOutlineIcon />}
                   onClick={handleRemoveItemFromCart}
                   disabled={loading}
-                  sx={{
-                    color: 'error.main',
-                    '&:hover': {
-                      bgcolor: 'error.lighter'
-                    }
-                  }}
+                  color="error"
+                  sx={{ minWidth: 'auto' }}
                 >
                   Remove
                 </Button>
               )}
-            </Box>
+            </Stack>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                Tk. {item?.product?.discountedPrice}
+            {/* Price Display */}
+            <Stack direction="row" alignItems="baseline" spacing={1}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Tk. {discountedPrice.toFixed(2)}
               </Typography>
-              {item?.product?.price > item?.product?.discountedPrice && (
+              {originalPrice > discountedPrice && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ textDecoration: 'line-through' }}
+                >
+                  Tk. {originalPrice.toFixed(2)}
+                </Typography>
+              )}
+              {discountPercentage > 0 && (
+                <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
+                  ({discountPercentage}% off)
+                </Typography>
+              )}
+            </Stack>
+
+            {/* Total Price Display */}
+            <Stack direction="row" alignItems="baseline" spacing={1}>
+              <Typography variant="body2" color="text.secondary">
+                Total:
+              </Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                Tk. {totalDiscountedPrice.toFixed(2)}
+              </Typography>
+              {totalSavings > 0 && (
                 <>
                   <Typography
                     variant="body2"
                     color="text.secondary"
                     sx={{ textDecoration: 'line-through' }}
                   >
-                    Tk. {item?.product?.price}
+                    Tk. {totalOriginalPrice.toFixed(2)}
                   </Typography>
-                  <Typography variant="body2" color="success.main">
-                    {item?.product?.discountPersent}% off
+                  <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
+                    (Save Tk. {totalSavings.toFixed(2)})
                   </Typography>
                 </>
               )}
-            </Box>
+            </Stack>
 
+            {/* Quantity Controls */}
             {showButton && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
-                <Box sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: 1,
-                  position: 'relative'
-                }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleUpdateCartItem(-1)}
-                    disabled={updateLoading || item?.quantity <= 1}
-                    sx={{ color: 'black' }}
-                  >
-                    <RemoveIcon fontSize="small" />
-                  </IconButton>
-                  <Typography sx={{ px: 2, py: 0.5, minWidth: '40px', textAlign: 'center' }}>
-                    {item?.quantity}
+              <Box sx={{ position: 'relative' }}>
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    Quantity:
                   </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleUpdateCartItem(1)}
-                    disabled={updateLoading}
-                    sx={{ color: 'black' }}
+                  <Box
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      bgcolor: 'background.paper'
+                    }}
                   >
-                    <AddIcon fontSize="small" />
-                  </IconButton>
-                  {updateLoading && (
-                    <CircularProgress
-                      size={24}
+                    <IconButton
+                      size="small"
+                      onClick={() => handleUpdateCartItem(-1)}
+                      disabled={updateLoading || quantity <= 1}
+                      sx={{ color: 'text.primary' }}
+                    >
+                      <RemoveIcon fontSize="small" />
+                    </IconButton>
+                    <Typography
                       sx={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        marginTop: '-12px',
-                        marginLeft: '-12px'
+                        px: 3,
+                        py: 0.5,
+                        minWidth: '40px',
+                        textAlign: 'center',
+                        userSelect: 'none'
                       }}
-                    />
+                    >
+                      {quantity}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleUpdateCartItem(1)}
+                      disabled={updateLoading}
+                      sx={{ color: 'text.primary' }}
+                    >
+                      <AddIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                  {updateLoading && (
+                    <CircularProgress size={20} />
                   )}
-                </Box>
-
-                <Typography variant="body2" color="text.secondary">
-                  Total: Tk. {(item?.quantity * item?.product?.discountedPrice).toFixed(2)}
-                </Typography>
+                </Stack>
               </Box>
             )}
-          </Box>
+
+            {/* Total Price Breakdown */}
+            <Box sx={{ 
+              mt: 1,
+              p: 2,
+              bgcolor: 'grey.50',
+              borderRadius: 1
+            }}>
+              <Stack spacing={1}>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="body2" color="text.secondary">
+                    Subtotal ({quantity} {quantity === 1 ? 'item' : 'items'})
+                  </Typography>
+                  <Typography variant="body2">
+                    Tk. {totalOriginalPrice.toFixed(2)}
+                  </Typography>
+                </Stack>
+
+                {item.productDiscount > 0 && (
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="success.main">
+                      Product Discount
+                    </Typography>
+                    <Typography variant="body2" color="success.main">
+                      -Tk. {productDiscount.toFixed(2)}
+                    </Typography>
+                  </Stack>
+                )}
+
+                {promoDiscount > 0 && (
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="success.main">
+                      Coupon Discount
+                    </Typography>
+                    <Typography variant="body2" color="success.main">
+                      -Tk. {promoDiscount.toFixed(2)}
+                    </Typography>
+                  </Stack>
+                )}
+
+                <Divider />
+
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-end">
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight="bold">
+                      Final Price
+                    </Typography>
+                    {totalDiscount > 0 && (
+                      <Typography variant="caption" color="success.main">
+                        You save {Math.round((totalDiscount / totalOriginalPrice) * 100)}% (Tk. {totalDiscount.toFixed(2)})
+                      </Typography>
+                    )}
+                  </Box>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Tk. {finalPrice.toFixed(2)}
+                  </Typography>
+                </Stack>
+              </Stack>
+            </Box>
+          </Stack>
         </Box>
-      </Paper>
-    </Box>
+      </Stack>
+    </Paper>
   );
 }
 
