@@ -396,66 +396,54 @@ const Homepage = () => {
       {Object.keys(newArrivalsByCategory).length > 0 && (
         <section style={{ padding: '1.5rem 0', minHeight: '60vh' }} ref={newArrivalsRef}>
           <Container maxWidth={false} sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
-            <Box sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              position: 'relative',
-              mb: 4,
-              overflow: 'hidden'
-            }}>
-              <Box sx={{
-                width: '100%',
-                maxWidth: '90%',
-                textAlign: 'center',
-                position: 'relative',
-                py: 2,
-                '&::before, &::after': {
-                  content: '""',
-                  position: 'absolute',
-                  height: '2px',
-                  width: '100%',
-                  background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.8) 50%, rgba(0,0,0,0) 100%)',
-                  left: 0
-                },
-                '&::before': { top: 0 },
-                '&::after': { bottom: 0 }
-              }}>
-                <Typography 
-                  variant="h3" 
-                  component="h2" 
-                  sx={{ 
-                    fontWeight: 600,
-                    color: '#000',
-                    fontSize: { xs: '1.8rem', sm: '2.2rem', md: '2.5rem' },
-                    textTransform: 'uppercase',
-                    letterSpacing: '3px',
-                    position: 'relative',
-                    display: 'inline-block',
-                    '&::after': {
-                      content: '""',
-                      position: 'absolute',
-                      bottom: '-8px',
-                      left: '25%',
-                      width: '50%',
-                      height: '3px',
-                      backgroundColor: '#000'
-                    }
-                  }}
-                >
-                  NEW ARRIVALS BY CATEGORY
-                </Typography>
-              </Box>
-            </Box>
-
             {level3Categories.map((cat) => {
               const products = newArrivalsByCategory[cat._id] || [];
               if (!products.length) return null;
               return (
                 <Box key={cat._id} sx={{ mb: 6 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-                    {cat.name}
-                  </Typography>
+                  <Box sx={{
+                    width: '100%',
+                    maxWidth: '90%',
+                    textAlign: 'center',
+                    position: 'relative',
+                    py: 2,
+                    mx: 'auto',
+                    '&::before, &::after': {
+                      content: '""',
+                      position: 'absolute',
+                      height: '2px',
+                      width: '100%',
+                      background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.8) 50%, rgba(0,0,0,0) 100%)',
+                      left: 0
+                    },
+                    '&::before': { top: 0 },
+                    '&::after': { bottom: 0 }
+                  }}>
+                    <Typography 
+                      variant="h3" 
+                      component="h2" 
+                      sx={{ 
+                        fontWeight: 600,
+                        color: '#000',
+                        fontSize: { xs: '1.6rem', sm: '2rem', md: '2.2rem' },
+                        textTransform: 'uppercase',
+                        letterSpacing: '3px',
+                        position: 'relative',
+                        display: 'inline-block',
+                        '&::after': {
+                          content: '""',
+                          position: 'absolute',
+                          bottom: '-8px',
+                          left: '25%',
+                          width: '50%',
+                          height: '3px',
+                          backgroundColor: '#000'
+                        }
+                      }}
+                    >
+                      {`NEW ARRIVALS - ${cat.name}`}
+                    </Typography>
+                  </Box>
                   <Suspense fallback={<div style={{ height: '400px' }} />}> 
                     <NewArrivalsCarousel 
                       products={products}

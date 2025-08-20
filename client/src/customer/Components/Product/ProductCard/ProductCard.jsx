@@ -29,7 +29,7 @@ const ProductCard = ({ product }) => {
   }, []);
 
   return (
-    <div onClick={handleNavigate} className='productCard w-[15rem] border m-3 transition-all cursor-pointer'>
+    <div onClick={handleNavigate} className='productCard w-[15rem] border m-0 transition-all cursor-pointer'>
       <div className='h-[20rem] relative overflow-hidden'>
         {!imageLoaded && (
           <Skeleton 

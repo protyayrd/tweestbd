@@ -27,29 +27,13 @@ const NewArrivalsCarousel = ({ products = [], getCategoryNameForProduct, inView 
     <Box sx={{ 
       position: 'relative',
       overflow: 'hidden',
-      touchAction: 'pan-y',
-      contentVisibility: 'auto',
-      containIntrinsicSize: '0 400px',
-      willChange: 'auto',
       py: 2,
       '& .swiper': {
         width: '100%',
-        height: 'auto',
-        overflow: 'visible',
-        backfaceVisibility: 'visible'
+        height: 'auto'
       },
       '& .swiper-slide': {
-        height: 'auto',
-        opacity: inView ? 0.75 : 1,
-        transform: inView ? 'scale(0.9)' : 'scale(1)',
-        transition: inView ? 'opacity 0.3s, transform 0.3s' : 'none',
-        '&.swiper-slide-active': {
-          opacity: 1,
-          transform: 'scale(1)'
-        }
-      },
-      '& .swiper-wrapper': {
-        alignItems: 'center'
+        height: 'auto'
       },
       '& .swiper-button-next, & .swiper-button-prev': {
         color: '#000',
@@ -62,9 +46,8 @@ const NewArrivalsCarousel = ({ products = [], getCategoryNameForProduct, inView 
         modules={[Navigation, Autoplay, FreeMode]}
         navigation
         loop
-        spaceBetween={20}
+        spaceBetween={0}
         slidesPerView={'auto'}
-        centeredSlides
         speed={500}
         autoplay={{
           delay: 4000,
@@ -74,56 +57,23 @@ const NewArrivalsCarousel = ({ products = [], getCategoryNameForProduct, inView 
         freeMode={{ enabled: true, sticky: true, momentumRatio: 0.25 }}
         watchSlidesProgress
         grabCursor
-        style={{ padding: '0 5%', overflow: 'visible' }}
+        style={{ padding: '0 0%', overflow: 'visible' }}
         onSwiper={(swiper) => {
           setSwiperInstance(swiper);
           if (onSwiperReady) onSwiperReady(swiper);
         }}
         breakpoints={{
-          320: { slidesPerView: 1.2, spaceBetween: 10, centeredSlides: true },
-          640: { slidesPerView: 1.5, spaceBetween: 15 },
-          768: { slidesPerView: 2.2, spaceBetween: 20 },
-          1024: { slidesPerView: 3.2, spaceBetween: 20 }
+          320: { slidesPerView: 2, spaceBetween: 0 },
+          640: { slidesPerView: 3, spaceBetween: 0 },
+          768: { slidesPerView: 4, spaceBetween: 0 },
+          1280: { slidesPerView: 5, spaceBetween: 0 }
         }}
       >
         {slides.map((product) => {
           const categoryName = getCategoryNameForProduct(product);
           return (
             <SwiperSlide key={product._id}>
-              <Box 
-                sx={{ 
-                  p: { xs: 1, md: 2 },
-                  height: '100%',
-                  willChange: 'transform',
-                  transform: 'translateZ(0)',
-                  position: 'relative'
-                }}
-              >
-                {categoryName && (
-                  <Box sx={{
-                    position: 'absolute',
-                    top: { xs: '8px', md: '16px' },
-                    left: { xs: '8px', md: '16px' },
-                    right: { xs: '8px', md: '16px' },
-                    zIndex: 5,
-                    px: 1.5,
-                    py: 0.8,
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                    color: '#fff',
-                    borderRadius: '2px',
-                    fontSize: { xs: '0.7rem', md: '0.8rem' },
-                    fontWeight: 500,
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px',
-                    textAlign: 'center',
-                  }}>
-                    {categoryName}
-                  </Box>
-                )}
-                <Box sx={{ backgroundColor: '#fff' }}>
-                  <ProductCard product={product} />
-                </Box>
-              </Box>
+              <ProductCard product={product} />
             </SwiperSlide>
           );
         })}
