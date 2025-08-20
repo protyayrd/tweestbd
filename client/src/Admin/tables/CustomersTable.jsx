@@ -9,135 +9,204 @@ import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
 import Typography from '@mui/material/Typography'
 import TableContainer from '@mui/material/TableContainer'
-import { Avatar, CardHeader } from '@mui/material'
+import { Avatar, Button, CardContent, CardHeader, CircularProgress, IconButton } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
-
-const rows = [
-  {
-    age: 27,
-    status: 'current',
-    date: '09/27/2018',
-    name: 'Sally Quinn',
-    salary: '$19586.23',
-    email: 'eebsworth2m@sbwire.com',
-    designation: 'Human Resources Assistant',
-    image:"https://rukminim1.flixcart.com/image/832/832/xif0q/lehenga-choli/c/v/q/free-half-sleeve-sadhna-kedar-fab-original-imagpawdqwjqz6vt.jpeg?q=70"
-  },
-  {
-    age: 61,
-    date: '09/23/2016',
-    salary: '$23896.35',
-    status: 'professional',
-    name: 'Margaret Bowers',
-    email: 'kocrevy0@thetimes.co.uk',
-    designation: 'Nuclear Power Engineer',
-    image:"https://rukminim1.flixcart.com/image/832/832/xif0q/lehenga-choli/c/v/q/free-half-sleeve-sadhna-kedar-fab-original-imagpawdqwjqz6vt.jpeg?q=70"
-  },
-  {
-    age: 59,
-    date: '10/15/2017',
-    name: 'Minnie Roy',
-    status: 'rejected',
-    salary: '$18991.67',
-    email: 'ediehn6@163.com',
-    designation: 'Environmental Specialist',
-    image:"https://rukminim1.flixcart.com/image/832/832/xif0q/lehenga-choli/c/v/q/free-half-sleeve-sadhna-kedar-fab-original-imagpawdqwjqz6vt.jpeg?q=70"
-  },
-  {
-    age: 30,
-    date: '06/12/2018',
-    status: 'resigned',
-    salary: '$19252.12',
-    name: 'Ralph Leonard',
-    email: 'dfalloona@ifeng.com',
-    designation: 'Sales Representative',
-    image:"https://rukminim1.flixcart.com/image/832/832/xif0q/lehenga-choli/c/v/q/free-half-sleeve-sadhna-kedar-fab-original-imagpawdqwjqz6vt.jpeg?q=70"
-  },
-  {
-    age: 66,
-    status: 'applied',
-    date: '03/24/2018',
-    salary: '$13076.28',
-    name: 'Annie Martin',
-    designation: 'Operator',
-    email: 'sganderton2@tuttocitta.it',
-    image:"https://rukminim1.flixcart.com/image/832/832/xif0q/lehenga-choli/c/v/q/free-half-sleeve-sadhna-kedar-fab-original-imagpawdqwjqz6vt.jpeg?q=70"
-  },
-  {
-    age: 33,
-    date: '08/25/2017',
-    salary: '$10909.52',
-    name: 'Adeline Day',
-    status: 'professional',
-    email: 'hnisius4@gnu.org',
-    designation: 'Senior Cost Accountant'
-  },
-  {
-    age: 61,
-    status: 'current',
-    date: '06/01/2017',
-    salary: '$17803.80',
-    name: 'Lora Jackson',
-    designation: 'Geologist',
-    email: 'ghoneywood5@narod.ru'
-  },
-  {
-    age: 22,
-    date: '12/03/2017',
-    salary: '$12336.17',
-    name: 'Rodney Sharp',
-    status: 'professional',
-    designation: 'Cost Accountant',
-    email: 'dcrossman3@google.co.jp'
-  }
-]
-
-const statusObj = {
-  applied: { color: 'info' },
-  rejected: { color: 'error' },
-  current: { color: 'primary' },
-  resigned: { color: 'warning' },
-  professional: { color: 'success' }
-}
+import { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { getAllCustomers } from '../../Redux/Admin/User/Action'
+import DotsVertical from 'mdi-material-ui/DotsVertical'
+import { Refresh, AccountDetails } from 'mdi-material-ui'
 
 const CustomersTable = () => {
-  const navigate=useNavigate();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { adminCustomers } = useSelector((store) => store);
+  
+  useEffect(() => {
+    dispatch(getAllCustomers())
+      .then(() => {
+      })
+      .catch(error => {
+        console.error('Error in getAllCustomers dispatch:', error);
+      });
+  }, [dispatch]);
+
+  useEffect(() => {
+    // Debug logging to check the state
+    console.log('CustomersTable state:', {
+      loading: adminCustomers.loading,
+      error: adminCustomers.error,
+      customersCount: adminCustomers.customers?.length || 0,
+      customersData: adminCustomers.customers?.slice(0, 1) || []
+    });
+  }, [adminCustomers]);
+
+  const handleRefresh = () => {
+    dispatch(getAllCustomers())
+      .then(() => {
+      })
+      .catch(error => {
+        console.error('Error in manual refresh:', error);
+      });
+  };
+
   return (
-    <Card>
+    <Card sx={{ 
+      boxShadow: '0 6px 16px rgba(0,0,0,0.1)', 
+      borderRadius: 3, 
+      overflow: 'hidden',
+      transition: 'all 0.3s ease',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column', 
+      '&:hover': { transform: 'translateY(-8px)', boxShadow: '0 12px 24px rgba(0,0,0,0.12)' } 
+    }}>
       <CardHeader
-          title='New Customers'
-          sx={{ pt: 2, alignItems: 'center', '& .MuiCardHeader-action': { mt: 0.6 } }}
-          action={<Typography onClick={()=>navigate("/admin/customers")} variant='caption' sx={{color:"blue",cursor:"pointer",paddingRight:".8rem"}}>View All</Typography>}
-          titleTypographyProps={{
-            variant: 'h5',
-            sx: { lineHeight: '1.6 !important', letterSpacing: '0.15px !important' }
+        title='New Customers'
+        titleTypographyProps={{
+          sx: { lineHeight: '1.2rem !important', letterSpacing: '0.15px !important', fontWeight: 600 }
+        }}
+        action={
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {adminCustomers.loading && <CircularProgress size={20} sx={{ mr: 1 }} />}
+            <IconButton size='small' onClick={handleRefresh} sx={{ color: 'text.secondary', mr: 1 }}>
+              <Refresh />
+            </IconButton>
+            <IconButton size='small' aria-label='settings' className='card-more-options' sx={{ color: 'text.secondary' }}>
+              <DotsVertical />
+            </IconButton>
+          </Box>
+        }
+        sx={{ 
+          borderBottom: '1px solid', 
+          borderColor: 'divider', 
+          backgroundColor: 'warning.light', 
+          color: 'warning.contrastText' 
+        }}
+      />
+      <CardContent sx={{ p: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <TableContainer sx={{ flex: 1 }}>
+          {adminCustomers.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+              <CircularProgress />
+            </Box>
+          ) : adminCustomers.error ? (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography color="error" sx={{ mb: 2 }}>Error loading customers: {adminCustomers.error}</Typography>
+              <Typography color="textSecondary" sx={{ mb: 2 }}>
+                Please check if the API server is running and the endpoint is correctly configured.
+              </Typography>
+              <Button variant="outlined" color="primary" onClick={handleRefresh}>
+                Try Again
+              </Button>
+            </Box>
+          ) : (
+            <Table aria-label='customers table'>
+              <TableHead>
+                <TableRow sx={{ '& .MuiTableCell-root': { fontWeight: 600, backgroundColor: 'background.default' } }}>
+                  <TableCell>Image</TableCell>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell align="center">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {adminCustomers.customers?.slice(0, 5).map(customer => (
+                  <TableRow 
+                    hover 
+                    key={customer._id} 
+                    sx={{ 
+                      '&:last-of-type td, &:last-of-type th': { border: 0 },
+                      transition: 'background-color 0.2s',
+                      '&:hover': { 
+                        backgroundColor: 'background.default'
+                      }
+                    }}
+                  >
+                    <TableCell>
+                      <Avatar 
+                        alt={customer.firstName || 'User'} 
+                        src={customer.profilePicture || ''}
+                        sx={{ 
+                          width: 40, 
+                          height: 40, 
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          border: '2px solid white'
+                        }}
+                      >
+                        {customer.firstName ? customer.firstName.charAt(0) : 'U'}
+                      </Avatar>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 500 }}>
+                      <Typography sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '0.875rem !important', 
+                        color: 'text.primary' 
+                      }}>
+                        {`${customer.firstName || ''} ${customer.lastName || ''}`}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                        {customer.email}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        color="warning"
+                        onClick={() => navigate(`/admin/customers`)}
+                        sx={{
+                          backgroundColor: 'warning.lighter',
+                          '&:hover': {
+                            backgroundColor: 'warning.light'
+                          }
+                        }}
+                      >
+                        <AccountDetails fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!adminCustomers.customers || adminCustomers.customers.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={4} sx={{ textAlign: 'center', py: 5 }}>
+                      <Typography variant="body1" sx={{ mb: 2 }}>No customers found</Typography>
+                      <Button variant="outlined" onClick={handleRefresh}>Refresh Data</Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </TableContainer>
+      </CardContent>
+      <Box sx={{ 
+        p: 2, 
+        display: 'flex', 
+        justifyContent: 'center', 
+        borderTop: '1px solid', 
+        borderColor: 'divider',
+        backgroundColor: 'background.default'
+      }}>
+        <Button 
+          fullWidth 
+          variant="contained" 
+          color="warning"
+          onClick={() => navigate('/admin/customers')}
+          sx={{ 
+            borderRadius: '8px',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+            py: 1,
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 6px 12px rgba(0,0,0,0.15)'
+            }
           }}
-        />
-      <TableContainer>
-        <Table sx={{ minWidth: 390 }} aria-label='table in dashboard'>
-          <TableHead>
-            <TableRow>
-            <TableCell>Image</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.slice(0,5).map(item => (
-              <TableRow hover key={item.name} sx={{ '&:last-of-type td, &:last-of-type th': { border: 0 } }}>
-                <TableCell> <Avatar alt={item.name} src={item.image} /> </TableCell>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.email}</TableCell>
-                
-                
-               
-               
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+        >
+          View All Customers
+        </Button>
+      </Box>
     </Card>
   )
 }

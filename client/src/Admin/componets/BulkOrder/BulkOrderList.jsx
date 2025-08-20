@@ -219,7 +219,7 @@ const BulkOrderList = () => {
                 ) : (
                   bulkOrders?.map((order) => (
                     <TableRow key={order._id}>
-                      <TableCell>{order._id}</TableCell>
+                      <TableCell>{order.formattedOrderId || order._id}</TableCell>
                       <TableCell>
                         {format(new Date(order.orderDate), 'PP')}
                       </TableCell>

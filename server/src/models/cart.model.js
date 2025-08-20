@@ -46,6 +46,24 @@ const cartSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  // Combo offer discount fields
+  comboOfferDiscount: {
+    type: Number,
+    required: true,
+    default: 0,
+    min: 0
+  },
+  appliedComboOffers: [{
+    categoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'categories'
+    },
+    categoryName: String,
+    offerName: String,
+    totalQuantity: Number,
+    perUnitPrice: Number,
+    totalDiscount: Number
+  }],
   // Store promoDetails as a simple object without validation
   promoDetailsCode: {
     type: String,
@@ -104,7 +122,7 @@ const cartSchema = new mongoose.Schema({
 
 // Virtual for total savings
 cartSchema.virtual('totalSavings').get(function() {
-  return this.discount + this.promoCodeDiscount;
+  return this.discount + this.promoCodeDiscount + this.comboOfferDiscount;
 });
 
 // Virtual for savings percentage

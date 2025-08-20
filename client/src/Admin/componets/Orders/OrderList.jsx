@@ -29,7 +29,7 @@ import {
 import InfoIcon from '@mui/icons-material/Info';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloseIcon from '@mui/icons-material/Close';
-import moment from 'moment';
+import { format } from 'date-fns';
 
 const OrderList = () => {
   const dispatch = useDispatch();
@@ -105,6 +105,19 @@ const OrderList = () => {
     return item?.product?.imageUrl ? getImageUrl(item.product.imageUrl) : "";
   };
 
+  // Format transaction ID to be more readable
+  const formatTransactionId = (transactionId) => {
+    if (!transactionId) return 'N/A';
+    
+    // If it includes a timestamp at the end, truncate it
+    if (transactionId.includes('-') && transactionId.split('-').length > 2) {
+      return transactionId.split('-').slice(0, 2).join('-');
+    }
+    
+    // Otherwise just return first 15 chars
+    return transactionId.length > 15 ? `${transactionId.substring(0, 15)}...` : transactionId;
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -123,6 +136,7 @@ const OrderList = () => {
             <TableRow>
               <TableCell>Image</TableCell>
               <TableCell>Title</TableCell>
+              <TableCell>SKU</TableCell>
               <TableCell>Price</TableCell>
               <TableCell>Id</TableCell>
               <TableCell>Status</TableCell>
@@ -151,6 +165,7 @@ const OrderList = () => {
                       </Box>
                     </TableCell>
                     <TableCell>{item.product?.title}</TableCell>
+                    <TableCell>{item.sku || item.product?.sku || '-'}</TableCell>
                     <TableCell>Tk. {item.price}</TableCell>
                     <TableCell>{item._id}</TableCell>
                     <TableCell>
@@ -231,7 +246,7 @@ const OrderList = () => {
                     Order ID: {selectedOrder._id}
                   </Typography>
                   <Typography variant="subtitle1" color="text.secondary">
-                    Date: {moment(selectedOrder.createdAt).format('MMM DD, YYYY hh:mm A')}
+                    Date: {format(new Date(selectedOrder.createdAt), 'MMM dd, yyyy hh:mm a')}
                   </Typography>
                 </Box>
               </Grid>
@@ -291,7 +306,7 @@ const OrderList = () => {
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                           <Typography color="text.secondary">Transaction ID:</Typography>
-                          <Typography>{selectedOrder.paymentDetails?.transactionId}</Typography>
+                          <Typography>{formatTransactionId(selectedOrder.paymentDetails?.transactionId)}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                           <Typography color="text.secondary">Phone:</Typography>
@@ -317,7 +332,7 @@ const OrderList = () => {
                           <Typography color="text.secondary">Payment Date:</Typography>
                           <Typography>
                             {selectedOrder.paymentDetails?.paymentDate 
-                              ? moment(selectedOrder.paymentDetails.paymentDate).format('MMM DD, YYYY')
+                              ? format(new Date(selectedOrder.paymentDetails.paymentDate), 'MMM dd, yyyy')
                               : 'Pending'}
                           </Typography>
                         </Box>

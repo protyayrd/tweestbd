@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   List,
@@ -14,9 +14,13 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import { adminNavigationItems } from './AdminNavigation';
 
 const AdminSidebar = () => {
+  
   const navigate = useNavigate();
   const location = useLocation();
   const [openMenus, setOpenMenus] = useState({});
+
+  useEffect(() => {
+  }, [location]);
 
   const handleClick = (item) => {
     if (item.children) {
@@ -101,7 +105,9 @@ const AdminSidebar = () => {
       }}
     >
       <List component="nav">
-        {adminNavigationItems.map((item) => renderNavItem(item))}
+        {adminNavigationItems.map((item) => {
+          return renderNavItem(item);
+        })}
       </List>
     </Box>
   );

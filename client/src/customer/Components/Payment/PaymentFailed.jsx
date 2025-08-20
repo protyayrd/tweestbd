@@ -59,6 +59,19 @@ const PaymentFailed = () => {
     }
   };
 
+  // Format transaction ID to be more readable
+  const formatTransactionId = (transactionId) => {
+    if (!transactionId) return 'N/A';
+    
+    // If it includes a timestamp at the end, truncate it
+    if (transactionId.includes('-') && transactionId.split('-').length > 2) {
+      return transactionId.split('-').slice(0, 2).join('-');
+    }
+    
+    // Otherwise just return first 15 chars
+    return transactionId.length > 15 ? `${transactionId.substring(0, 15)}...` : transactionId;
+  };
+
   return (
     <Container maxWidth="md" sx={{ py: 8 }}>
       <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
@@ -87,7 +100,7 @@ const PaymentFailed = () => {
             {paymentDetails.transactionId !== 'N/A' && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography variant="body2">Transaction ID:</Typography>
-                <Typography variant="body2" fontWeight="medium">{paymentDetails.transactionId}</Typography>
+                <Typography variant="body2" fontWeight="medium">{formatTransactionId(paymentDetails.transactionId)}</Typography>
               </Box>
             )}
             {paymentDetails.paymentPhoneNumber !== 'N/A' && (

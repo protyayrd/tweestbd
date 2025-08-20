@@ -16,6 +16,15 @@ const reviewSchema = new Schema({
     ref: 'users',
     required: true,
   },
+  rating: {
+    type: Number,
+    required: true,
+    default: 5,
+  },
+  verifiedPurchase: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

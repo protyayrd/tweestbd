@@ -1,21 +1,19 @@
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const User = require('../models/user.model.js');
 const jwtProvider=require("../config/jwtProvider")
 
 const createUser = async (userData)=>{
     try {
-        let {firstName,lastName,email,password,role}=userData;
+        let {firstName, lastName, email, password, role, phone} = userData;
 
-        const isUserExist=await User.findOne({email});
+        const isUserExist = await User.findOne({email});
 
         if(isUserExist){
             throw new Error("user already exists with email: " + email);
         }
-
-        password=await bcrypt.hash(password,8);
     
-        const user=await User.create({firstName,lastName,email,password,role})
+        const user = await User.create({firstName, lastName, email, password, role, phone})
 
         console.log("Created user:", user);
     
@@ -77,6 +75,21 @@ const getUserProfileByToken=async(token)=>{
     }
 }
 
+const getUserByPhone = async (phone) => {
+    try {
+        const user = await User.findOne({ phone });
+        
+        if (!user) {
+            throw new Error("user not found with phone: " + phone);
+        }
+        
+        return user;
+    } catch (error) {
+        console.log("Error getting user by phone:", error.message);
+        throw error;
+    }
+}
+
 const getAllUsers=async()=>{
     try {
         const users=await User.find();
@@ -87,10 +100,88 @@ const getAllUsers=async()=>{
     }
 }
 
+const getAllCustomers=async()=>{
+    try {
+        const customers=await User.find({ role: "CUSTOMER" });
+        return customers;
+    } catch (error) {
+        console.log("Error getting all customers:", error.message);
+        throw error;
+    }
+}
+
+const updateUserProfile = async (userId, updateData) => {
+    try {
+        // Find user by ID and update
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $set: updateData },
+            { new: true } // Return the updated document
+        );
+        
+        if (!updatedUser) {
+            throw new Error("User not found with id: " + userId);
+        }
+        
+        // Don't return the password
+        updatedUser.password = undefined;
+        
+        return updatedUser;
+    } catch (error) {
+        console.log("Error updating user profile:", error.message);
+        throw error;
+    }
+}
+
+const deleteUser = async (userId) => {
+    try {
+        // Check if user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            throw new Error("User not found with id: " + userId);
+        }
+        
+        // Delete the user
+        await User.findByIdAndDelete(userId);
+        
+        return { success: true };
+    } catch (error) {
+        console.log("Error deleting user:", error.message);
+        throw error;
+    }
+}
+
+const updatePassword = async (userId, newPassword) => {
+    try {
+        // Find user
+        const user = await User.findById(userId);
+        if (!user) {
+            throw new Error("User not found with id: " + userId);
+        }
+        
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        
+        // Update the password
+        user.password = hashedPassword;
+        await user.save();
+        
+        return { success: true };
+    } catch (error) {
+        console.log("Error updating password:", error.message);
+        throw error;
+    }
+}
+
 module.exports={
     createUser,
     findUserById,
     getUserProfileByToken,
     getUserByEmail,
-    getAllUsers
+    getUserByPhone,
+    getAllUsers,
+    getAllCustomers,
+    updateUserProfile,
+    deleteUser,
+    updatePassword
 }

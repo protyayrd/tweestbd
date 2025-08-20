@@ -46,7 +46,6 @@ const customerProductReducer = (state = initialState, action) => {
       };
 
     case FIND_PRODUCTS_BY_CATEGORY_SUCCESS:
-      console.log("Products received in reducer:", action.payload);
       return { 
         ...state, 
         loading: false,

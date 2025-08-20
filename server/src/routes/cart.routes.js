@@ -22,4 +22,7 @@ router.get("/item/:cartItemId", authenticate, cartController.getCartItem);
 router.post("/apply-promo", authenticate, cartController.applyPromoCode);
 router.delete("/remove-promo", authenticate, cartController.removePromoCode);
 
+// DELETE: /api/cart/clear
+router.delete("/clear", authenticate, cartController.clearCart);
+
 module.exports = router;

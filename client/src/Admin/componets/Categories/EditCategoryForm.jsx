@@ -67,7 +67,6 @@ const EditCategoryForm = ({ category, onClose }) => {
         categoryData.parentCategory = formData.parentCategory;
       }
 
-      console.log('Updating category:', {
         categoryId: category._id,
         categoryData
       });

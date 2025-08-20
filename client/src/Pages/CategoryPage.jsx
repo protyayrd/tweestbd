@@ -6,12 +6,13 @@ import { selectCategories, selectCategoryLoading, selectCategoryError } from "..
 import { Box, Grid, Container, Typography, CircularProgress, Alert, styled, Breadcrumbs, Link } from "@mui/material";
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { motion } from "framer-motion";
+import { getImageUrl } from "../config/api";
 
-const CategoryCard = styled(motion.div)(({ theme }) => ({
+const CategoryCard = styled(motion.div)({
   width: '100%',
   backgroundColor: '#fff',
   position: 'relative',
-  height: '100%',
+  height: '600px',
   display: 'flex',
   flexDirection: 'column',
   margin: 0,
@@ -24,112 +25,177 @@ const CategoryCard = styled(motion.div)(({ theme }) => ({
   '&:hover': {
     transform: 'translateY(-8px)',
     boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
+  },
+  '@media (max-width: 768px)': {
+    height: '300px',
   }
-}));
+});
 
-const ImageContainer = styled(Box)(({ theme }) => ({
-  width: '100%',
-  paddingTop: '66.67%', // 3:2 aspect ratio
+const ImageContainer = styled(Box)({
   position: 'relative',
+  width: '100%',
+  height: '100%',
   overflow: 'hidden',
-  margin: 0,
-  background: '#f5f5f5',
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-  '&::after': {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  '&::before': {
     content: '""',
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%)',
-    opacity: 0.85,
-    transition: 'opacity 0.3s ease',
+    backgroundImage: 'inherit',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center center',
+    transition: 'transform 0.3s ease',
   },
-  '&:hover': {
-    transform: 'scale(1.05)',
-    '&::after': {
-      opacity: 0.95,
-    }
-  }
-}));
-
-const CategoryInfo = styled(Box)(({ theme }) => ({
-  padding: '1.5rem',
-  textAlign: 'center',
-  position: 'absolute',
-  bottom: '50%',
-  left: 0,
-  right: 0,
-  transform: 'translateY(50%)',
-  zIndex: 2,
-  transition: 'transform 0.3s ease',
-  '& .category-title': {
-    fontSize: { xs: '2.5rem', sm: '3rem', md: '3.5rem' },
-    fontFamily: "'Playfair Display', serif",
-    fontWeight: 700,
-    color: '#fff',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
-    marginBottom: '1rem',
-    lineHeight: 1,
+  '&:hover::before': {
+    transform: 'scale(1.1)',
   },
-  '& .view-collection': {
-    fontSize: { xs: '0.7rem', sm: '0.75rem', md: '0.8rem' },
-    color: '#fff',
-    textTransform: 'uppercase',
-    letterSpacing: '2px',
-    fontWeight: 400,
-    textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
-    position: 'relative',
-    display: 'inline-block',
-    textDecoration: 'underline',
-    textUnderlineOffset: '3px',
-    transition: 'all 0.3s ease',
-    '&:hover': {
-      letterSpacing: '3px',
-      textUnderlineOffset: '5px'
-    }
+  '& img': {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    objectPosition: 'center center',
+    display: 'block',
+    margin: '0 auto',
   }
-}));
+});
 
-const BannerOverlay = styled(Box)(({ theme }) => ({
+const CategoryInfo = styled(Box)({
   position: 'absolute',
   top: 0,
   left: 0,
   right: 0,
   bottom: 0,
-  background: 'linear-gradient(45deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 100%)',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '1rem',
+  color: 'white',
+  textAlign: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  opacity: 1,
+  transition: 'opacity 0.3s ease',
+  '@media (max-width: 768px)': {
+    opacity: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-end',
+    paddingBottom: '2rem',
+  }
+});
+
+const CategoryTitle = styled(Typography)({
+  fontSize: 'clamp(1.5rem, 3vw, 2.5rem)',
+  fontWeight: 700,
+  marginBottom: '0.5rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  textShadow: '2px 2px 8px rgba(0,0,0,0.7)',
+  color: 'white',
+  '@media (max-width: 768px)': {
+    fontSize: 'clamp(1.2rem, 2.5vw, 1.8rem)',
+    marginBottom: '0.25rem',
+  }
+});
+
+const ViewCollection = styled(Typography)({
+  fontSize: 'clamp(0.9rem, 1.5vw, 1.2rem)',
+  fontWeight: 500,
+  textShadow: '1px 1px 6px rgba(0,0,0,0.6)',
+  color: 'white',
+  '@media (max-width: 768px)': {
+    fontSize: 'clamp(0.8rem, 1.2vw, 1rem)',
+  }
+});
+
+const CategoryDescription = styled(Typography)({
+  fontSize: 'clamp(0.9rem, 1.5vw, 1.2rem)',
+  fontWeight: 400,
+  maxWidth: '80%',
+  textShadow: '1px 1px 4px rgba(0,0,0,0.5)',
+  '@media (max-width: 768px)': {
+    fontSize: 'clamp(0.8rem, 1.2vw, 1rem)',
+    maxWidth: '90%',
+  }
+});
+
+const BannerOverlay = styled(Box)({
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   flexDirection: 'column',
   gap: '1.5rem',
   padding: '0 1rem',
-}));
+  backgroundColor: 'transparent',
+  '@media (max-width: 768px)': {
+    gap: '1rem',
+    padding: '0 0.5rem',
+    backgroundColor: 'transparent',
+  }
+});
 
 const CategoryPage = () => {
-  const { categoryId } = useParams();
+  const { param: categoryParam } = useParams(); // Unified parameter for slug or ID
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const categories = useSelector(selectCategories);
-  const categoryLoading = useSelector(selectCategoryLoading);
-  const categoryError = useSelector(selectCategoryError);
+  const categories = useSelector(selectCategories) || [];
+  const categoryLoading = useSelector(selectCategoryLoading) || false;
+  const categoryError = useSelector(selectCategoryError) || null;
 
   const currentCategory = useMemo(() => {
-    return categories?.find(cat => cat._id === categoryId);
-  }, [categories, categoryId]);
+    const key = categoryParam;
+    if (!key) return null;
+    // Match by slug first, then by id
+    return categories?.find(cat => cat.slug === key) || categories?.find(cat => cat._id === key) || null;
+  }, [categories, categoryParam]);
 
   const subcategories = useMemo(() => {
     if (!categories || !currentCategory) return [];
-    return categories.filter(cat => 
-      cat.parentCategory && cat.parentCategory._id === categoryId
-    );
-  }, [categories, categoryId, currentCategory]);
+    
+    // Log for debugging
+    console.log('Category data:', {
+      currentCategory,
+      allCategories: categories
+    });
+    
+    if (currentCategory.level === 1) {
+      const level2Cats = categories.filter(cat => 
+        cat.parentCategory && cat.parentCategory._id === currentCategory._id
+      );
+      return level2Cats;
+    }
+    
+    if (currentCategory.level === 2) {
+      const level3Cats = categories.filter(cat => 
+        cat.parentCategory && cat.parentCategory._id === currentCategory._id
+      );
+      return level3Cats;
+    }
+    
+    return [];
+  }, [categories, currentCategory]);
+
+  const parentCategory = useMemo(() => {
+    if (!currentCategory?.parentCategory?._id) return null;
+    return categories?.find(cat => cat._id === currentCategory.parentCategory._id);
+  }, [categories, currentCategory]);
+
+  // Canonicalize URL to slug if user visited with an ID
+  useEffect(() => {
+    if (currentCategory && categoryParam && currentCategory.slug && categoryParam === currentCategory._id) {
+      navigate(`/category/${currentCategory.slug}`, { replace: true });
+    }
+  }, [currentCategory, categoryParam, navigate]);
 
   useEffect(() => {
     if (!categories) {
@@ -137,37 +203,24 @@ const CategoryPage = () => {
     }
   }, [dispatch, categories]);
 
-  const handleSubcategoryClick = (subcategoryId) => {
-    navigate(`/products?category=${subcategoryId}&page=1`);
-  };
-
-  const handleAllProductsClick = () => {
-    try {
-      // Create a query object for better handling
-      const queryParams = new URLSearchParams();
-      
-      // Only add subcategories if they exist
-      if (subcategories.length > 0) {
-        subcategories.forEach(sub => {
-          queryParams.append('subcategories', sub._id);
-        });
-      }
-      
-      // Add page parameter
-      queryParams.append('page', '1');
-      
-      // Navigate with the constructed query string
-      navigate(`/products?${queryParams.toString()}`);
-    } catch (error) {
-      console.error('Navigation error:', error);
-      // You might want to show an error message to the user here
+  const handleSubcategoryClick = (subcategory) => {
+    const clickedCategory = typeof subcategory === 'string' ? categories.find(cat => cat._id === subcategory) : subcategory;
+    const subcategoryId = clickedCategory?._id || subcategory; // Ensure we have an ID for the API call
+    
+    if (clickedCategory.level === 3 || !categories.some(cat => cat.parentCategory?._id === subcategoryId)) { // Check for actual children
+              navigate(`/${clickedCategory.slug || subcategoryId}&page=1`);
+    } else {
+      navigate(`/category/${clickedCategory.slug || subcategoryId}`);
     }
   };
 
-  const getImageUrl = (imageUrl) => {
+  const handleImageUrl = (imageUrl) => {
     if (!imageUrl) return 'https://via.placeholder.com/400x600';
-    if (imageUrl.startsWith('http')) return imageUrl;
-    return `${process.env.REACT_APP_API_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+    
+    // Log for debugging
+    const processedUrl = getImageUrl(imageUrl);
+    
+    return processedUrl;
   };
 
   if (categoryLoading) {
@@ -198,7 +251,6 @@ const CategoryPage = () => {
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#fff' }}>
-      {/* Breadcrumb Navigation */}
       <Box sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)', mb: 0, backgroundColor: '#fff' }}>
         <Box sx={{ py: 2, px: { xs: 2, sm: 3, md: 4 } }}>
           <Breadcrumbs 
@@ -211,19 +263,30 @@ const CategoryPage = () => {
               sx={{ 
                 textDecoration: 'none',
                 color: 'text.primary',
-                '&:hover': { 
-                  textDecoration: 'underline',
-                }
+                '&:hover': { textDecoration: 'underline' }
               }}
             >
               Home
             </Link>
+            {parentCategory && (
+              <Link
+                color="inherit"
+                onClick={() => navigate(`/category/${parentCategory.slug || parentCategory._id}`)}
+                sx={{ 
+                  textDecoration: 'none',
+                  color: 'text.primary',
+                  cursor: 'pointer',
+                  '&:hover': { textDecoration: 'underline' }
+                }}
+              >
+                {parentCategory.name}
+              </Link>
+            )}
             <Typography color="text.primary">{currentCategory.name}</Typography>
           </Breadcrumbs>
         </Box>
       </Box>
 
-      {/* Category Banner */}
       <Box
         sx={{
           position: 'relative',
@@ -235,14 +298,13 @@ const CategoryPage = () => {
       >
         <Box
           component="img"
-          src={getImageUrl(currentCategory.imageUrl)}
+          src={handleImageUrl(currentCategory.imageUrl)}
           alt={currentCategory.name}
           sx={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
             objectPosition: 'center',
-            filter: 'brightness(0.85)',
           }}
         />
         <BannerOverlay>
@@ -259,11 +321,17 @@ const CategoryPage = () => {
                 textAlign: 'center',
                 textTransform: 'uppercase',
                 fontWeight: 900,
-                textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
-                fontSize: { xs: '2rem', sm: '3rem', md: '4rem', lg: '5rem' },
-                letterSpacing: { xs: '3px', sm: '4px', md: '6px' },
-                marginBottom: { xs: 1, sm: 1.5, md: 2 },
-                px: { xs: 1, sm: 2 }
+                fontSize: {
+                  xs: 'clamp(1.5rem, 6vw, 2.5rem)',
+                  sm: 'clamp(2rem, 8vw, 3rem)',
+                  md: 'clamp(2.5rem, 10vw, 4rem)',
+                  lg: '5rem'
+                },
+                letterSpacing: { xs: '2px', sm: '3px', md: '4px', lg: '6px' },
+                marginBottom: { xs: 0.5, sm: 1, md: 1.5 },
+                px: { xs: 1, sm: 2 },
+                lineHeight: { xs: 1.2, sm: 1.3, md: 1.4 },
+                textShadow: '2px 2px 10px rgba(0,0,0,0.8)'
               }}
             >
               {currentCategory.name}
@@ -280,11 +348,15 @@ const CategoryPage = () => {
                 color: 'white',
                 textAlign: 'center',
                 textTransform: 'uppercase',
-                letterSpacing: { xs: '4px', sm: '6px', md: '8px' },
-                textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
-                fontSize: { xs: '0.875rem', sm: '1.1rem', md: '1.4rem' },
+                letterSpacing: { xs: '2px', sm: '3px', md: '4px' },
+                fontSize: {
+                  xs: 'clamp(0.7rem, 2vw, 0.9rem)',
+                  sm: 'clamp(0.8rem, 2.5vw, 1.1rem)',
+                  md: 'clamp(0.9rem, 3vw, 1.4rem)'
+                },
                 fontWeight: 300,
-                px: { xs: 1, sm: 2 }
+                px: { xs: 1, sm: 2 },
+                textShadow: '2px 2px 8px rgba(0,0,0,0.7)',
               }}
             >
               Discover Our Collection
@@ -293,63 +365,35 @@ const CategoryPage = () => {
         </BannerOverlay>
       </Box>
 
-      {/* Subcategories Section */}
       {subcategories.length > 0 && (
-        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, mb: 8 }}>
+        <Box sx={{ width: '100%', py: 2 }}>
           <Grid container spacing={2}>
-            {/* View All Products Card */}
-            <Grid item xs={6} md={4}>
-              <CategoryCard
-                onClick={handleAllProductsClick}
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3 }}
-              >
-                <ImageContainer
-                  sx={{
-                    backgroundImage: `url(${getImageUrl(currentCategory.imageUrl)})`,
-                  }}
-                >
-                  <CategoryInfo>
-                    <Typography className="category-title">
-                      All Products
-                    </Typography>
-                    <Typography className="view-collection">
-                      View Collection
-                    </Typography>
-                  </CategoryInfo>
-                </ImageContainer>
-              </CategoryCard>
-            </Grid>
-
-            {/* Subcategories */}
             {subcategories.map((subcat, index) => (
-              <Grid item xs={6} md={4} key={subcat._id}>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
+              <Grid item xs={12} sm={6} key={subcat._id} sx={{ height: '100%' }}>
+                <CategoryCard
+                  onClick={() => handleSubcategoryClick(subcat._id)}
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <CategoryCard
-                    onClick={() => handleSubcategoryClick(subcat._id)}
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.3 }}
+                  <ImageContainer
+                    sx={{
+                      backgroundImage: `url(${handleImageUrl(subcat.imageUrl)})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      height: '100%',
+                      width: '100%'
+                    }}
                   >
-                    <ImageContainer
-                      sx={{
-                        backgroundImage: `url(${getImageUrl(subcat.imageUrl)})`,
-                      }}
-                    >
-                      <CategoryInfo>
-                        <Typography className="category-title">
-                          {subcat.name}
-                        </Typography>
-                        <Typography className="view-collection">
-                          View Collection
-                        </Typography>
-                      </CategoryInfo>
-                    </ImageContainer>
-                  </CategoryCard>
-                </motion.div>
+                    <CategoryInfo>
+                      <CategoryTitle>
+                        {subcat.name}
+                      </CategoryTitle>
+                      <ViewCollection sx={{ mt: 0.5 }}>
+                        {subcat.level === 3 ? 'Shop Now' : 'View Collection'}
+                      </ViewCollection>
+                    </CategoryInfo>
+                  </ImageContainer>
+                </CategoryCard>
               </Grid>
             ))}
           </Grid>

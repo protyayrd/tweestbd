@@ -17,7 +17,7 @@ import {
   DELETE_PRODUCT_SUCCESS,
   DELETE_PRODUCT_FAILURE,
 } from "./ActionType";
-import api, { API_BASE_URL } from "../../../config/api";
+import api, { API_BASE_URL } from '../../../config/api';
 
 // Selectors
 export const selectCustomerProducts = state => state.customersProduct;
@@ -59,16 +59,54 @@ export const findProducts = (reqData) => async (dispatch) => {
     if (reqData.isFeatured) params.append("isFeatured", reqData.isFeatured);
     if (reqData.search) params.append("search", reqData.search);
 
-    console.log("Filter params:", Object.fromEntries(params.entries()));
 
-    const requestUrl = `/api/products?${params.toString()}`;
-    console.log("Fetching products with URL:", requestUrl);
+    const requestUrl = `${API_BASE_URL}/api/products?${params.toString()}`;
     
-    const response = await api.get(requestUrl);
-    console.log("Products API response:", response.data);
+    const response = await axios.get(requestUrl);
     
     if (!response.data) {
       throw new Error('No data received from API');
+    }
+
+    // Extract available filters from the response
+    // The API should return an object with available filter options
+    const availableFilters = response.data.availableFilters || {
+      colors: [],
+      sizes: []
+    };
+
+    // If the API doesn't provide available filters, try to extract them from the products
+    if (!response.data.availableFilters && response.data.content && response.data.content.length > 0) {
+      const products = response.data.content;
+      
+      // Extract unique colors
+      const uniqueColors = new Set();
+      products.forEach(product => {
+        if (product.color) {
+          // Color might be a string or an array
+          if (Array.isArray(product.color)) {
+            product.color.forEach(c => uniqueColors.add(c));
+          } else {
+            uniqueColors.add(product.color);
+          }
+        }
+      });
+      
+      // Extract unique sizes
+      const uniqueSizes = new Set();
+      products.forEach(product => {
+        if (product.size) {
+          // Size might be a string or an array
+          if (Array.isArray(product.size)) {
+            product.size.forEach(s => uniqueSizes.add(s));
+          } else {
+            uniqueSizes.add(product.size);
+          }
+        }
+      });
+      
+      availableFilters.colors = Array.from(uniqueColors);
+      availableFilters.sizes = Array.from(uniqueSizes);
     }
 
     dispatch({
@@ -78,10 +116,7 @@ export const findProducts = (reqData) => async (dispatch) => {
         totalPages: response.data.totalPages || 1,
         currentPage: response.data.currentPage || 0,
         totalProducts: response.data.totalProducts || 0,
-        availableFilters: response.data.availableFilters || {
-          colors: [],
-          sizes: []
-        }
+        availableFilters: availableFilters
       }
     });
 
@@ -103,7 +138,6 @@ export const findProductById = (reqData) => async (dispatch) => {
     // Remove any auth headers for product viewing
     const { data } = await axios.get(`${API_BASE_URL}/api/products/id/${reqData.productId}`);
 
-    console.log("products by id : ", data);
     dispatch({
       type: FIND_PRODUCT_BY_ID_SUCCESS,
       payload: data,
@@ -119,14 +153,40 @@ export const findProductById = (reqData) => async (dispatch) => {
   }
 };
 
+export const findProductBySlug = (slug) => async (dispatch) => {
+  try {
+    console.log('findProductBySlug called with slug:', slug);
+    dispatch({ type: FIND_PRODUCT_BY_ID_REQUEST });
+
+    // Remove any auth headers for product viewing
+    const { data } = await axios.get(`${API_BASE_URL}/api/products/slug/${slug}`);
+    console.log('findProductBySlug API response:', data);
+
+    dispatch({
+      type: FIND_PRODUCT_BY_ID_SUCCESS,
+      payload: data,
+    });
+    console.log('findProductBySlug SUCCESS dispatched');
+  } catch (error) {
+    console.error('findProductBySlug ERROR:', error);
+    console.error('Error response:', error.response);
+    dispatch({
+      type: FIND_PRODUCT_BY_ID_FAILURE,
+      payload:
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message,
+    });
+  }
+};
+
 export const createProduct = (product) => async (dispatch) => {
   try {
     dispatch({ type: CREATE_PRODUCT_REQUEST });
 
-    console.log('Creating product with data:', product);
 
     const { data } = await api.post(
-      '/api/admin/products',
+      `/api/admin/products`,
       product,
       {
         headers: {
@@ -135,7 +195,6 @@ export const createProduct = (product) => async (dispatch) => {
       }
     );
 
-    console.log('Product created successfully:', data);
 
     dispatch({
       type: CREATE_PRODUCT_SUCCESS,
@@ -164,14 +223,12 @@ export const updateProduct = (productData) => async (dispatch) => {
 
     const { productId, ...updateData } = productData;
     
-    console.log("Updating product:", { productId, updateData });
     
     const { data } = await api.put(
       `/api/admin/products/${productId}`,
       updateData
     );
     
-    console.log("Product updated successfully:", data);
     
     dispatch({
       type: UPDATE_PRODUCT_SUCCESS,
@@ -194,22 +251,18 @@ export const updateProduct = (productData) => async (dispatch) => {
 };
 
 export const deleteProduct = (productId) => async (dispatch) => {
-  console.log("delete product action",productId)
   try {
     dispatch({ type: DELETE_PRODUCT_REQUEST });
 
-    let {data}=await api.delete(`/api/admin/products/${productId}`);
+    let {data} = await api.delete(`/api/admin/products/${productId}`);
 
-    console.log("delete product ",data)
 
     dispatch({
       type: DELETE_PRODUCT_SUCCESS,
       payload: productId,
     });
 
-    console.log("product delte ",data)
   } catch (error) {
-    console.log("catch error ",error)
     dispatch({
       type: DELETE_PRODUCT_FAILURE,
       payload:

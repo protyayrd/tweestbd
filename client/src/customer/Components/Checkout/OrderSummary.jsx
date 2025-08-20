@@ -4,11 +4,18 @@ import { useLocation, useNavigate } from "react-router-dom";
 import CartItem from "../Cart/CartItem";
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getOrderById, createOrder } from "../../../Redux/Customers/Order/Action";
+import { getOrderById, createOrder, getOrderSummary } from "../../../Redux/Customers/Order/Action";
+import { findUserCart } from "../../../Redux/Customers/Cart/Action";
+import { trackInitiateCheckout } from "../../../utils/gtmEvents";
 import AddressCard from "../adreess/AdreessCard";
 import { getImageUrl } from "../../../config/api";
+import pathaoService from '../../../services/pathaoService';
+import priceService from '../../../services/priceCalculationService';
+import PriceDetailsPanel from './PriceDetailsPanel';
+import api from '../../../config/api';
+import ArrowBack from '@mui/icons-material/ArrowBack';
 
-const OrderSummary = ({ handleNext }) => {
+const OrderSummary = ({ handleNext, handleBack, isGuestCheckout, guestCart }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -18,12 +25,204 @@ const OrderSummary = ({ handleNext }) => {
   const { order, cart } = useSelector(state => state);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
+  const [deliveryChargeLoading, setDeliveryChargeLoading] = useState(false);
+  const [deliveryChargeError, setDeliveryChargeError] = useState(null);
+
+  // For guest checkout, use the cart data passed as prop
+  const activeCart = isGuestCheckout && !jwt ? guestCart : cart;
+  const cartItems = activeCart?.cartItems || [];
 
   useEffect(() => {
     if(orderId) {
       dispatch(getOrderById(orderId));
+    } else {
+      // Fetch cart data when component mounts, but only for logged-in users
+      if (!isGuestCheckout || jwt) {
+        dispatch(findUserCart());
+      }
     }
-  }, [orderId, dispatch]);
+  }, [orderId, dispatch, isGuestCheckout, jwt]);
+  
+  // Track InitiateCheckout event when cart data is loaded
+  useEffect(() => {
+    if (!orderId && cart.cartItems && cart.cartItems.length > 0) {
+      trackInitiateCheckout(cart.cartItems, cart);
+    }
+  }, [orderId, cart.cartItems, cart]);
+
+  // Add this logging to see the full cart data structure
+  useEffect(() => {
+    // This block was intended to check for product colors
+    // Since it's not doing anything, we can remove the empty conditionals
+    // if (cart.cartItems && cart.cartItems.length > 0) {
+    //   if (cart.cartItems[0]?.product?.colors) {
+    //   } else {
+    //   }
+    // }
+  }, [cart.cartItems]);
+
+  // Optimize the calculateDeliveryCharge function to reduce CPU usage
+  useEffect(() => {
+    const calculateDeliveryCharge = async () => {
+      try {
+        // Skip if we're already loading or have a delivery charge for an existing order
+        if (deliveryChargeLoading || (orderId && order.order?.deliveryCharge !== undefined)) {
+          if (orderId && order.order?.deliveryCharge !== undefined) {
+            setDeliveryCharge(order.order.deliveryCharge);
+          }
+          return;
+        }
+        
+        setDeliveryChargeLoading(true);
+        setDeliveryChargeError(null);
+        
+        // Get the selected address - only calculate once
+        let addressData;
+        try {
+          addressData = JSON.parse(localStorage.getItem("selectedAddress"));
+        } catch (e) {
+          console.error('Error parsing selected address:', e);
+          setDeliveryChargeError("Invalid address data");
+          setDeliveryCharge(110); // Default to outside Dhaka rate
+          setDeliveryChargeLoading(false);
+          return;
+        }
+        
+        if (!addressData || !addressData.city) {
+          setDeliveryChargeError("Please select a delivery address");
+          setDeliveryCharge(120); // Default to outside Dhaka rate
+          setDeliveryChargeLoading(false);
+          return;
+        }
+
+        try {
+          // Simple delivery charge calculation based on city
+          const cityName = addressData.city.toString().toLowerCase();
+          let charge;
+          if (cityName === 'dhaka') {
+            charge = 60; // Dhaka main city
+          } else if (cityName.includes('dhaka')) {
+            charge = 90; // Dhaka sub areas
+          } else {
+            charge = 120; // Outside Dhaka
+          }
+
+          console.log('Delivery charge calculation:', {
+            city: addressData.city,
+            isDhaka,
+            charge
+          });
+
+          setDeliveryCharge(charge);
+          setDeliveryChargeError(null);
+        } catch (error) {
+          console.error('Error calculating delivery charge:', error);
+          setDeliveryChargeError("Error calculating delivery charge");
+          setDeliveryCharge(120); // Default to outside Dhaka rate
+        } finally {
+          setDeliveryChargeLoading(false);
+        }
+      } catch (error) {
+        console.error('Error calculating delivery charge:', error);
+        setDeliveryChargeError("Failed to calculate delivery charge");
+        setDeliveryCharge(110); // Default rate
+        setDeliveryChargeLoading(false);
+      }
+    };
+
+    // Only calculate when component mounts or when order changes
+    calculateDeliveryCharge();
+  }, [orderId, order.order?.deliveryCharge, deliveryChargeLoading]);
+
+  // For guest checkout with no cart data, redirect to cart
+  useEffect(() => {
+    if (isGuestCheckout && !jwt && (!guestCart || !cartItems || cartItems.length === 0)) {
+      navigate("/cart");
+    }
+  }, [isGuestCheckout, jwt, guestCart, cartItems, navigate]);
+
+  // Get address data from localStorage for guests
+  const [guestAddress, setGuestAddress] = useState(null);
+  
+  useEffect(() => {
+    if (isGuestCheckout && !jwt) {
+      const addressData = localStorage.getItem('guestAddress');
+      if (addressData) {
+        try {
+          setGuestAddress(JSON.parse(addressData));
+        } catch (e) {
+          console.error("Error parsing guest address:", e);
+        }
+      } else {
+        // If no address data, go back to address form
+        handleBack();
+      }
+    }
+  }, [isGuestCheckout, jwt, handleBack]);
+
+  // Use the appropriate address based on guest status
+  const selectedAddress = isGuestCheckout && !jwt 
+    ? guestAddress 
+    : order?.order?.shippingAddress;
+
+  // Optimize the address display logic by extracting the address parsing into a helper function
+  const getFormattedAddress = (addressObj) => {
+    if (!addressObj) return '';
+    
+    const parts = [];
+    
+    if (addressObj.streetAddress) parts.push(addressObj.streetAddress);
+    if (addressObj.area) parts.push(addressObj.area);
+    if (addressObj.zone) parts.push(addressObj.zone);
+    if (addressObj.city) parts.push(addressObj.city);
+    
+    return parts.join(', ') + (addressObj.zipCode ? ` - ${addressObj.zipCode}` : '');
+  };
+
+  // Early return for loading state
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Functions to calculate price details
+  const calculateTotal = () => {
+    if (isGuestCheckout && !jwt) {
+      // For guest checkout, use the cart data directly
+      const productPrice = Number(activeCart?.totalPrice || 0);
+      const productDiscount = (Number(activeCart?.discount || 0) - (Number(activeCart?.promoCodeDiscount || 0)));
+      const promoDiscount = Number(activeCart?.promoCodeDiscount || 0);
+      const delivery = Number(deliveryCharge || 0);
+      const totalAmount = Math.max(0, productPrice - productDiscount - promoDiscount + delivery);
+      
+      return {
+        totalPrice: productPrice,
+        totalDiscountedPrice: totalAmount,
+        discount: productDiscount + promoDiscount,
+        productDiscount: productDiscount || 0, // Ensure this is not null/undefined
+        promoDiscount: promoDiscount || 0,
+        deliveryCharge: delivery || 0,
+        totalAmount: totalAmount
+      };
+    }
+    
+    // For logged-in users with existing order
+    return {
+      totalPrice: order?.order?.totalPrice || 0,
+      totalDiscountedPrice: order?.order?.totalDiscountedPrice || 0,
+      discount: order?.order?.discount || 0,
+      productDiscount: order?.order?.productDiscount || 0, // Ensure this is not null/undefined
+      deliveryCharge: order?.order?.deliveryCharge || 0,
+      totalAmount: order?.order?.totalAmount || 0,
+      promoDiscount: order?.order?.promoCodeDiscount || 0
+    };
+  };
+  
+  const priceDetails = calculateTotal();
 
   const handleCreateOrder = async () => {
     try {
@@ -37,41 +236,106 @@ const OrderSummary = ({ handleNext }) => {
         throw new Error("No address selected. Please go back and select a delivery address.");
       }
       
+      // Calculate prices using the price service for consistency
+      // This ensures the same calculation logic is used across components
+      const productPrice = Number(cart.totalPrice) || 0;
+      const productDiscount = (Number(cart.discount) || 0) - (Number(cart.promoCodeDiscount) || 0);
+      const promoDiscount = Number(cart.promoCodeDiscount) || 0;
+      const delivery = Number(deliveryCharge) || 0;
+      
+      // Calculate the total discounted price
+      const finalPrice = priceService.calculateFinalPrice({
+        productPrice,
+        productDiscount,
+        promoDiscount,
+        deliveryCharge: delivery,
+        paymentOption: 'online'
+      });
+      
+      // Create the order data object with safe default values for all fields
       const orderData = {
-        address: selectedAddress,
-        orderItems: cart.cartItems.map((item) => ({
-          product: item.product._id,
-          size: item.size,
-          quantity: item.quantity,
-          price: item.price,
-          discountedPrice: item.discountedPrice,
-          color: item.color || null // Ensure color is included
-        })),
-        totalPrice: cart.totalPrice,
-        totalDiscountedPrice: cart.totalDiscountedPrice,
-        discount: cart.discount,
-        productDiscount: cart.discount - (cart.promoCodeDiscount || 0),
-        promoCodeDiscount: cart.promoCodeDiscount || 0,
-        promoDetails: cart.promoDetails || {
-          code: null,
-          discountType: null,
-          discountAmount: 0,
-          maxDiscountAmount: null
+        address: {
+          ...selectedAddress,
+          // Ensure all required fields exist
+          division: selectedAddress.division || selectedAddress.state || "Dhaka",
+          district: selectedAddress.district || selectedAddress.city || "Dhaka",
+          upazilla: selectedAddress.upazilla || selectedAddress.area || selectedAddress.zone || "Gulshan",
+          zipCode: selectedAddress.zipCode || "1212",
+          isGuestAddress: true  // Set this flag for guest orders
         },
-        totalItem: cart.totalItem,
-        jwt: jwt
+        orderItems: (cartItems || []).map((item) => ({
+          product: item?.product?._id,
+          size: item?.size || "",
+          quantity: item?.quantity || 1,
+          price: item?.price || 0,
+          discountedPrice: item?.discountedPrice || 0,
+          color: item?.color || ""
+        })),
+        totalPrice: productPrice + delivery,
+        totalDiscountedPrice: finalPrice,
+        discount: productDiscount + promoDiscount,
+        productDiscount: productDiscount || 0,
+        promoCodeDiscount: promoDiscount || 0,
+        deliveryCharge: delivery || 0,
+        totalItem: cartItems?.length || 0
       };
 
-      console.log("Creating order with data:", orderData);
-      const result = await dispatch(createOrder(orderData));
-      setLoading(false);
-      
-      // If we have an order ID, update the URL and then proceed to next step
-      if (result?.payload?._id) {
-        navigate(`/checkout?step=3&order_id=${result.payload._id}`);
+      // For guest checkout, save this data to localStorage to be accessible in the payment step
+      if (isGuestCheckout && !jwt) {
+        try {
+          const guestOrderData = {
+            ...orderData,
+            cartItems: cartItems || [],
+            _id: null // Will be filled after API response
+          };
+          
+          localStorage.setItem('guestOrderData', JSON.stringify(guestOrderData));
+        } catch (e) {
+          console.error('Error saving guest order data to localStorage:', e);
+          // Continue with the order creation anyway
+        }
       }
-      
-      handleNext();
+
+      try {
+        // Log the address data we're about to send
+        console.log("Guest checkout address data:", {
+          address: {
+            ...selectedAddress,
+            division: selectedAddress.division || selectedAddress.state || "Dhaka",
+            district: selectedAddress.district || selectedAddress.city || "Dhaka",
+            upazilla: selectedAddress.upazilla || selectedAddress.area || selectedAddress.zone || "Gulshan",
+            zipCode: selectedAddress.zipCode || "1212"
+          }
+        });
+        
+        // Use the guest order API endpoint
+        const response = await api.post('/api/orders/guest', orderData);
+        
+        if (response.data && response.data._id) {
+          setLoading(false);
+          
+          // If guest checkout, update the order data in localStorage with the order ID
+          if (isGuestCheckout && !jwt) {
+            try {
+              const guestOrderData = JSON.parse(localStorage.getItem('guestOrderData') || '{}');
+              guestOrderData._id = response.data._id;
+              localStorage.setItem('guestOrderData', JSON.stringify(guestOrderData));
+            } catch (e) {
+              console.error('Error updating guest order data in localStorage:', e);
+              // Continue with the order creation anyway
+            }
+          }
+          
+          navigate(`/checkout?step=3&order_id=${response.data._id}`);
+          handleNext();
+          return;
+        }
+      } catch (error) {
+        console.error('Error creating order:', error);
+        console.error('Error response:', error.response?.data);
+        setError(error.response?.data?.message || 'Failed to create order. Please try again.');
+        setLoading(false);
+      }
     } catch (error) {
       console.error("Error creating order:", error);
       setLoading(false);
@@ -93,194 +357,392 @@ const OrderSummary = ({ handleNext }) => {
   if (!orderId && !order.order) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Paper elevation={0} variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#ffffff', color: '#000000' }}>
-          <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 3, color: '#000000' }}>
+        <Paper 
+          elevation={0} 
+          variant="outlined" 
+          sx={{ 
+            p: 4, 
+            borderRadius: 2, 
+            bgcolor: '#ffffff', 
+            color: '#000000',
+            border: '1px solid',
+            borderColor: '#00503a20'
+          }}
+        >
+          <Typography 
+            variant="h5" 
+            gutterBottom 
+            sx={{ 
+              fontWeight: 600, 
+              mb: 4, 
+              color: '#000000',
+              pb: 2,
+              borderBottom: '2px solid',
+              borderColor: '#00503a20'
+            }}
+          >
             Order Summary
           </Typography>
           
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert 
+              severity="error" 
+              sx={{ 
+                mb: 3,
+                '& .MuiAlert-icon': {
+                  color: '#ff1744'
+                }
+              }}
+            >
               {error}
             </Alert>
           )}
           
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: '#000000' }}>
-              Selected Address
+          <Box sx={{ mb: 4 }}>
+            <Typography 
+              variant="h6" 
+              gutterBottom 
+              sx={{ 
+                fontWeight: 600, 
+                color: '#000000',
+                mb: 2
+              }}
+            >
+              Delivery Address
             </Typography>
             {JSON.parse(localStorage.getItem("selectedAddress")) ? (
               <Box sx={{ 
-                p: 2, 
-                bgcolor: '#f5f5f5', 
-                borderRadius: 1,
+                p: 3, 
+                bgcolor: '#00503a08', 
+                borderRadius: 2,
                 border: '1px solid',
-                borderColor: '#000000'
+                borderColor: '#00503a20'
               }}>
-                <Typography variant="body1" gutterBottom color="#000000">
-                  {JSON.parse(localStorage.getItem("selectedAddress")).firstName} {JSON.parse(localStorage.getItem("selectedAddress")).lastName}
+                <Typography 
+                  variant="subtitle1" 
+                  gutterBottom 
+                  sx={{
+                    color: '#000000',
+                    fontWeight: 600
+                  }}
+                >
+                  {(() => {
+                    try {
+                      const addr = JSON.parse(localStorage.getItem("selectedAddress"));
+                      return addr.name || `${addr.firstName || ''} ${addr.lastName || ''}`.trim();
+                    } catch (e) {
+                      console.error('Error parsing address:', e);
+                      return 'Name not available';
+                    }
+                  })()}
                 </Typography>
-                <Typography variant="body2" color="#000000" gutterBottom>
-                  {JSON.parse(localStorage.getItem("selectedAddress")).streetAddress}
-                  {JSON.parse(localStorage.getItem("selectedAddress")).upazilla ? `, ${JSON.parse(localStorage.getItem("selectedAddress")).upazilla}` : ''}
-                  {JSON.parse(localStorage.getItem("selectedAddress")).district ? `, ${JSON.parse(localStorage.getItem("selectedAddress")).district}` : ''}
-                  {JSON.parse(localStorage.getItem("selectedAddress")).division ? `, ${JSON.parse(localStorage.getItem("selectedAddress")).division}` : ''}
-                  {JSON.parse(localStorage.getItem("selectedAddress")).zipCode ? ` - ${JSON.parse(localStorage.getItem("selectedAddress")).zipCode}` : ''}
+                <Typography 
+                  variant="body1" 
+                  sx={{
+                    color: '#000000',
+                    mb: 1
+                  }}
+                >
+                  {(() => {
+                    try {
+                      const addr = JSON.parse(localStorage.getItem("selectedAddress"));
+                      return getFormattedAddress(addr);
+                    } catch (e) {
+                      console.error('Error parsing address:', e);
+                      return 'Address data not available';
+                    }
+                  })()}
                 </Typography>
-                <Typography variant="body2" color="#000000">
+                <Typography 
+                  variant="body1" 
+                  sx={{
+                    color: '#00503a',
+                    fontWeight: 500
+                  }}
+                >
                   Phone: {JSON.parse(localStorage.getItem("selectedAddress")).mobile}
                 </Typography>
               </Box>
             ) : (
-              <Alert severity="warning">
+              <Alert 
+                severity="warning"
+                sx={{
+                  bgcolor: '#fff3e0',
+                  color: '#ff6d00',
+                  '& .MuiAlert-icon': {
+                    color: '#ff6d00'
+                  }
+                }}
+              >
                 No address selected. Please go back and select a delivery address.
               </Alert>
             )}
           </Box>
           
-          <Divider sx={{ my: 3, bgcolor: '#000000' }} />
+          <Divider sx={{ my: 4, borderColor: '#00503a20' }} />
           
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: '#000000' }}>
-            Cart Items
+          <Typography 
+            variant="h6" 
+            gutterBottom 
+            sx={{ 
+              fontWeight: 600, 
+              color: '#000000',
+              mb: 3
+            }}
+          >
+            Cart Items ({cart.cartItems?.length || 0})
           </Typography>
           
-          {cart.cartItems.map((item) => (
-            <Box key={item._id} sx={{ mb: 2 }}>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={3} sm={2}>
-                  <Box sx={{ 
-                    height: 80, 
-                    width: 80, 
-                    position: 'relative', 
-                    border: '1px solid #000000',
-                    borderRadius: 1,
-                    overflow: 'hidden'
-                  }}>
-                    <img 
-                      src={item.product.imageUrl && item.product.imageUrl.length > 0 
-                        ? getImageUrl(item.product.imageUrl[0]) 
-                        : 'https://via.placeholder.com/80'}
-                      alt={item.product.title}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://via.placeholder.com/80';
-                      }}
-                    />
-                  </Box>
-                </Grid>
-                <Grid item xs={9} sm={10}>
-                  <Typography variant="body1" gutterBottom color="#000000">
-                    {item.product.title}
-                  </Typography>
-                  <Typography variant="body2" color="#000000">
-                    Size: {item.size}
-                    {item.color && `, Color: ${item.color}`}
-                    , Qty: {item.quantity}
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 600, color: '#000000' }}>
-                      ৳{item.discountedPrice}
-                    </Typography>
-                    {item.price !== item.discountedPrice && (
-                      <>
-                        <Typography variant="body2" sx={{ textDecoration: 'line-through', ml: 1 }} color="#666666">
-                          ৳{item.price}
-                        </Typography>
-                        <Typography variant="body2" sx={{ ml: 1 }} color="#000000">
-                          ({Math.round(((item.price - item.discountedPrice) / item.price) * 100)}% off)
-                        </Typography>
-                      </>
-                    )}
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                    <Typography variant="body2" color="#000000">
-                      Total: ৳{(item.discountedPrice * item.quantity).toFixed(2)}
-                    </Typography>
-                    {item.price !== item.discountedPrice && (
-                      <>
-                        <Typography variant="body2" sx={{ textDecoration: 'line-through', ml: 1 }} color="#666666">
-                          ৳{(item.price * item.quantity).toFixed(2)}
-                        </Typography>
-                        <Typography variant="body2" color="#000000" sx={{ ml: 1 }}>
-                          (Save ৳{((item.price - item.discountedPrice) * item.quantity).toFixed(2)})
-                        </Typography>
-                      </>
-                    )}
-                  </Box>
-                </Grid>
-              </Grid>
-              <Divider sx={{ my: 2, bgcolor: '#000000' }} />
+          {cart.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress sx={{ color: '#00503a' }} />
             </Box>
-          ))}
-          
-          <Box sx={{ mt: 3 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <Typography variant="body1" color="#000000">Subtotal ({cart.totalItem} {cart.totalItem === 1 ? 'item' : 'items'})</Typography>
-              </Grid>
-              <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                <Typography variant="body1" color="#000000">৳{cart.totalPrice}</Typography>
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body1" color="#000000">Product Discount</Typography>
-              </Grid>
-              <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                <Typography variant="body1" color="#000000">-৳{cart.discount - (cart.promoCodeDiscount || 0)}</Typography>
-              </Grid>
-              
-              {cart.promoCodeDiscount > 0 && (
-                <>
-                  <Grid item xs={6}>
-                    <Typography variant="body1" color="#000000">Promo Code Discount</Typography>
+          ) : cart.error ? (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {cart.error}
+            </Alert>
+          ) : cart.cartItems && cart.cartItems.length > 0 ? (
+            cart.cartItems.map((item) => (
+              <Box 
+                key={item._id} 
+                sx={{ 
+                  mb: 3,
+                  pb: 3,
+                  borderBottom: '1px solid',
+                  borderColor: '#00503a20',
+                  '&:last-child': {
+                    borderBottom: 'none',
+                    pb: 0,
+                    mb: 0
+                  }
+                }}
+              >
+                {/* Debug information for price calculation */}
+                {console.log('Item price details:', {
+                  regularPrice: item.price,
+                  discountedPrice: item.discountedPrice,
+                  displayPrice: (item.discountedPrice !== undefined && item.discountedPrice > 0) ? item.discountedPrice : (item.price || 0)
+                })}
+                <Grid container spacing={3} alignItems="flex-start">
+                  {/* Product Image */}
+                  <Grid item xs={4} sm={3}>
+                    <Box 
+                      sx={{ 
+                        height: { xs: 150, sm: 200 }, 
+                        width: '100%',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        border: '1px solid',
+                        borderColor: 'rgba(0, 0, 0, 0.1)',
+                        bgcolor: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative'
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={(() => {
+                          
+                          try {
+                            // Get the color directly from the item
+                            const itemColor = item.color;
+                            
+                            // If we have colors array and a specific color, try to get color's image
+                            if (itemColor && item.product?.colors) {
+                              const selectedColor = item.product.colors.find(c => c.name === itemColor);
+                              if (selectedColor?.images?.length > 0) {
+                                const imagePath = selectedColor.images[0];
+                                const imageUrl = getImageUrl(imagePath);
+                                return imageUrl;
+                              }
+                            }
+                            
+                            // Check for selectedColorImages array (from cart service)
+                            if (item.product?.selectedColorImages?.length > 0) {
+                              const imageUrl = getImageUrl(item.product.selectedColorImages[0]);
+                              return imageUrl;
+                            }
+                            
+                            // First try to get the product's main image
+                            if (item.product?.imageUrl) {
+                              const imageUrl = getImageUrl(item.product.imageUrl);
+                              return imageUrl;
+                            }
+                            
+                            // Fallback to embedded SVG image
+                            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNHB4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzY2NjY2NiI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                          } catch (error) {
+                            console.error('Error in image URL resolution:', error);
+                            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNHB4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2NjMDAwMCI+RXJyb3I8L3RleHQ+PC9zdmc+';
+                          }
+                        })()}
+                        alt={item.product?.title || 'Product Image'}
+                        sx={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'contain',
+                          p: 2,
+                          zIndex: 1,
+                          transition: 'transform 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.05)'
+                          }
+                        }}
+                        onError={(e) => {
+                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNHB4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2NjMDAwMCI+RXJyb3I8L3RleHQ+PC9zdmc+';
+                        }}
+                      />
+                    </Box>
                   </Grid>
-                  <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                    <Typography variant="body1" color="#000000">-৳{cart.promoCodeDiscount}</Typography>
-                  </Grid>
-                </>
-              )}
-              
-              <Grid item xs={12}>
-                <Divider sx={{ my: 1, bgcolor: '#000000' }} />
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: '#000000' }}>Total</Typography>
-              </Grid>
-              <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: '#000000' }}>৳{cart.totalDiscountedPrice}</Typography>
-              </Grid>
-              
-              {cart.discount > 0 && (
-                <Grid item xs={12}>
-                  <Box sx={{ 
-                    p: 1.5, 
-                    bgcolor: '#f5f5f5',
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: '#000000',
-                    mt: 1
-                  }}>
-                    <Typography variant="body2" color="#000000" sx={{ fontWeight: 500 }}>
-                      You save ৳{cart.discount} ({Math.round((cart.discount / cart.totalPrice) * 100)}% off) on this order
+                  
+                  {/* Product Details */}
+                  <Grid item xs={8} sm={9}>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 600, 
+                        color: '#000000',
+                        fontSize: { xs: '1rem', sm: '1.25rem' },
+                        mb: 1
+                      }}
+                    >
+                      {item.product?.title || 'Product'}
                     </Typography>
-                  </Box>
+                    
+                    <Stack direction="row" spacing={3} sx={{ mb: 2 }}>
+                      <Typography 
+                        variant="body1" 
+                        sx={{
+                          color: '#00503a',
+                          fontWeight: 500
+                        }}
+                      >
+                        Size: {item.size || 'N/A'}
+                      </Typography>
+                      {item.color && (
+                        <Typography 
+                          variant="body1" 
+                          sx={{
+                            color: '#00503a',
+                            fontWeight: 500
+                          }}
+                        >
+                          Color: {item.color}
+                        </Typography>
+                      )}
+                      <Typography 
+                        variant="body1" 
+                        sx={{
+                          color: '#00503a',
+                          fontWeight: 500
+                        }}
+                      >
+                        Qty: {item.quantity}
+                      </Typography>
+                    </Stack>
+                    
+                    {/* Price Display */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <Typography 
+                        variant="h6" 
+                            sx={{ 
+                          fontWeight: 600, 
+                          color: '#00503a'
+                            }}
+                          >
+                        {
+                          // Debug the price values
+                          (() => {
+                            // Get product price directly from product object if item price is undefined
+                            const productPrice = item.product?.price || 0;
+                            const productDiscountedPrice = item.product?.discountedPrice || 0;
+                            
+                            // Use either item prices or product prices, whichever is available
+                            const regularPrice = Number(item.price !== undefined ? item.price : productPrice) || 0;
+                            const discPrice = Number(item.discountedPrice !== undefined ? item.discountedPrice : productDiscountedPrice) || 0;
+                            
+                            console.log('Price calculation details:', {
+                              itemPrice: item.price,
+                              itemDiscountedPrice: item.discountedPrice,
+                              productPrice: productPrice,
+                              productDiscountedPrice: productDiscountedPrice,
+                              finalRegularPrice: regularPrice,
+                              finalDiscPrice: discPrice
+                            });
+                            
+                            // More reliable price calculation logic that handles all edge cases
+                            const displayPrice = regularPrice > 0 ? (discPrice > 0 ? discPrice : regularPrice) : 0;
+                            
+                            return `৳${displayPrice.toFixed(2)}`;
+                          })()
+                        }
+                          </Typography>
+                      {(item.price || 0) > (item.discountedPrice || 0) && (
+                        <>
+                          <Typography 
+                            variant="body1" 
+                            sx={{ 
+                              textDecoration: 'line-through', 
+                              ml: 2,
+                              color: '#666666'
+                            }}
+                          >
+                            ৳{(item.price || 0).toFixed(2)}
+                          </Typography>
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                              ml: 2,
+                            color: '#00503a',
+                              bgcolor: '#00503a15',
+                              px: 1,
+                              py: 0.5,
+                              borderRadius: 1,
+                              fontWeight: 500
+                          }}
+                        >
+                            {(item.price || 0) > 0 ? Math.round(((item.price || 0) - (item.discountedPrice || 0)) / (item.price || 0) * 100) : 0}% off
+                        </Typography>
+                        </>
+                      )}
+                    </Box>
+                  </Grid>
                 </Grid>
-              )}
-            </Grid>
-          </Box>
+              </Box>
+            ))
+          ) : (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Your cart is empty. Please add items to your cart before proceeding to checkout.
+            </Alert>
+          )}
           
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
-            <Button 
-              variant="contained" 
-              size="large"
+          <Box sx={{ mt: 4 }}>
+            <PriceDetailsPanel 
+              totalItem={cartItems?.length || 0}
+              totalPrice={activeCart?.totalPrice || 0}
+              productDiscount={(Number(activeCart?.discount || 0) - Number(activeCart?.promoCodeDiscount || 0)) || 0}
+              promoCodeDiscount={Number(activeCart?.promoCodeDiscount || 0)}
+              deliveryCharge={deliveryCharge}
+              paymentOption="online"
+            />
+          </Box>
+
+          <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
               onClick={handleProceedToPayment}
               disabled={loading || !JSON.parse(localStorage.getItem("selectedAddress"))}
-              sx={{ 
-                bgcolor: '#000000', 
-                color: '#ffffff',
+              sx={{
+                bgcolor: 'black',
+                color: 'white',
+                px: 4,
+                py: 1.5,
+                fontSize: '1.1rem',
+                fontWeight: 600,
                 '&:hover': {
-                  bgcolor: '#333333',
+                  bgcolor: '#00503a'
                 },
                 '&.Mui-disabled': {
                   bgcolor: '#cccccc',
@@ -288,7 +750,11 @@ const OrderSummary = ({ handleNext }) => {
                 }
               }}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : "Proceed to Payment"}
+              {loading ? (
+                <CircularProgress size={24} sx={{ color: 'white' }} />
+              ) : (
+                'Proceed to Payment'
+              )}
             </Button>
           </Box>
         </Paper>
@@ -330,7 +796,8 @@ const OrderSummary = ({ handleNext }) => {
                 mb: 3, 
                 borderRadius: 2,
                 bgcolor: '#ffffff',
-                borderColor: '#000000'
+                borderColor: 'rgba(0, 0, 0, 0.1)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
               }}
             >
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 3, color: '#000000' }}>
@@ -340,7 +807,7 @@ const OrderSummary = ({ handleNext }) => {
               {/* Order ID and Date */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="body2" color="#000000" gutterBottom>
-                  Order ID: {order.order._id}
+                  Order ID: {order.order.formattedOrderId || order.order._id}
                 </Typography>
                 <Typography variant="body2" color="#000000">
                   Placed on: {new Date(order.order.createdAt).toLocaleDateString('en-US', {
@@ -351,7 +818,7 @@ const OrderSummary = ({ handleNext }) => {
                 </Typography>
               </Box>
               
-              <Divider sx={{ my: 3, bgcolor: '#000000' }} />
+              <Divider sx={{ my: 3, bgcolor: 'rgba(0, 0, 0, 0.1)' }} />
               
               {/* Shipping Address */}
               <Box sx={{ mb: 3 }}>
@@ -360,20 +827,23 @@ const OrderSummary = ({ handleNext }) => {
                 </Typography>
                 <Box sx={{ 
                   p: 2, 
-                  bgcolor: '#f5f5f5', 
-                  borderRadius: 1,
+                  bgcolor: 'rgba(0, 0, 0, 0.02)', 
+                  borderRadius: 2,
                   border: '1px solid',
-                  borderColor: '#000000'
+                  borderColor: 'rgba(0, 0, 0, 0.1)'
                 }}>
-                  <Typography variant="body1" gutterBottom color="#000000">
+                  <Typography variant="body1" gutterBottom color="#000000" fontWeight={500}>
                     {order.order.shippingAddress?.firstName || ''} {order.order.shippingAddress?.lastName || ''}
                   </Typography>
                   <Typography variant="body2" color="#000000" gutterBottom>
-                    {order.order.shippingAddress?.streetAddress || ''}
-                    {order.order.shippingAddress?.upazilla ? `, ${order.order.shippingAddress.upazilla}` : ''}
-                    {order.order.shippingAddress?.district ? `, ${order.order.shippingAddress.district}` : ''}
-                    {order.order.shippingAddress?.division ? `, ${order.order.shippingAddress.division}` : ''}
-                    {order.order.shippingAddress?.zipCode ? ` - ${order.order.shippingAddress.zipCode}` : ''}
+                    {(() => {
+                      try {
+                        return getFormattedAddress(order.order.shippingAddress);
+                      } catch (e) {
+                        console.error('Error formatting order address:', e);
+                        return 'Address data not available';
+                      }
+                    })()}
                   </Typography>
                   <Typography variant="body2" color="#000000">
                     Phone: {order.order.shippingAddress?.mobile || ''}
@@ -381,11 +851,19 @@ const OrderSummary = ({ handleNext }) => {
                 </Box>
               </Box>
               
-              <Divider sx={{ my: 3, bgcolor: '#000000' }} />
+              <Divider sx={{ my: 3, bgcolor: 'rgba(0, 0, 0, 0.1)' }} />
               
               {/* Order Items */}
               <Box>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: '#000000' }}>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom 
+                  sx={{ 
+                    fontWeight: 600, 
+                    color: '#000000',
+                    mb: 3
+                  }}
+                >
                   Order Items ({order.order.orderItems.length})
                 </Typography>
                 
@@ -393,105 +871,222 @@ const OrderSummary = ({ handleNext }) => {
                   <Box 
                     key={item._id} 
                     sx={{ 
-                      display: 'flex', 
-                      py: 2,
+                      mb: 3,
+                      pb: 3,
                       borderBottom: '1px solid',
-                      borderColor: '#000000'
+                      borderColor: 'rgba(0, 0, 0, 0.1)',
+                      '&:last-child': {
+                        borderBottom: 'none',
+                        pb: 0,
+                        mb: 0
+                      }
                     }}
                   >
-                    {/* Product Image */}
-                    <Box 
-                      sx={{ 
-                        width: 80, 
-                        height: 80, 
-                        borderRadius: 1,
-                        overflow: 'hidden',
-                        mr: 2,
-                        border: '1px solid',
-                        borderColor: '#000000'
-                      }}
-                    >
-                      <Box
-                        component="img"
-                        src={item.product?.imageUrl && Array.isArray(item.product.imageUrl) && item.product.imageUrl.length > 0
-                          ? getImageUrl(item.product.imageUrl[0])
-                          : item.product?.imageUrl 
-                            ? getImageUrl(item.product.imageUrl)
-                            : 'https://via.placeholder.com/80'}
-                        alt={item.product?.title || 'Product Image'}
-                        sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://via.placeholder.com/80';
-                        }}
-                      />
-                    </Box>
-                    
-                    {/* Product Details */}
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 500, color: '#000000' }}>
-                        {item.product?.title || 'Product'}
-                      </Typography>
+                    <Grid container spacing={3} alignItems="flex-start">
+                      {/* Product Image */}
+                      <Grid item xs={4} sm={3}>
+                        <Box 
+                          sx={{ 
+                            height: { xs: 150, sm: 180 }, 
+                            width: '100%',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            border: '1px solid',
+                            borderColor: 'rgba(0, 0, 0, 0.1)',
+                            position: 'relative',
+                            bgcolor: '#ffffff'
+                          }}
+                        >
+                          <Box
+                            component="img"
+                            src={(() => {
+                              
+                              try {
+                                // Get the color directly from the item
+                                const itemColor = item.color;
+                                
+                                // Check for product details with color image (added in our updated createOrder)
+                                if (item.productDetails?.colorImage) {
+                                  const imageUrl = getImageUrl(item.productDetails.colorImage);
+                                  return imageUrl;
+                                }
+                                
+                                // Try to find matching product in the cart with the same color
+                                if (itemColor && cart.cartItems && cart.cartItems.length > 0) {
+                                  
+                                  // Find a cart item with the same product ID and color
+                                  const matchingCartItem = cart.cartItems.find(
+                                    cartItem => 
+                                      cartItem.product._id === item.product._id && 
+                                      cartItem.color === itemColor
+                                  );
+                                  
+                                  if (matchingCartItem) {
+                                    
+                                    // Try to get the image from the product's colors array
+                                    if (matchingCartItem.product.colors) {
+                                      const colorObj = matchingCartItem.product.colors.find(
+                                        c => c.name === itemColor
+                                      );
+                                      
+                                      if (colorObj?.images?.length > 0) {
+                                        const imageUrl = getImageUrl(colorObj.images[0]);
+                                        return imageUrl;
+                                      }
+                                    }
+                                    
+                                    // Try to get the image from selectedColorImages
+                                    if (matchingCartItem.product.selectedColorImages?.length > 0) {
+                                      const imageUrl = getImageUrl(matchingCartItem.product.selectedColorImages[0]);
+                                      return imageUrl;
+                                    }
+                                  }
+                                }
+                                
+                                // First try to get the product's main image
+                                if (item.product?.imageUrl) {
+                                  const imageUrl = getImageUrl(item.product.imageUrl);
+                                  return imageUrl;
+                                }
+                                
+                                // Fallback to embedded SVG image
+                                return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNHB4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzY2NjY2NiI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                              } catch (error) {
+                                console.error('Error in image URL resolution:', error);
+                                return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNHB4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2NjMDAwMCI+RXJyb3I8L3RleHQ+PC9zdmc+';
+                              }
+                            })()}
+                            alt={item.product?.title || 'Product Image'}
+                            sx={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'contain',
+                              p: 2,
+                              zIndex: 1,
+                              transition: 'transform 0.3s ease',
+                              '&:hover': {
+                                transform: 'scale(1.05)'
+                              }
+                            }}
+                            onError={(e) => {
+                              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNHB4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2NjMDAwMCI+RXJyb3I8L3RleHQ+PC9zdmc+';
+                            }}
+                          />
+                        </Box>
+                      </Grid>
                       
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', mt: 1, gap: 2 }}>
-                        <Typography variant="body2" color="#000000">
-                          Size: {item.size || 'N/A'}
+                      {/* Product Details */}
+                      <Grid item xs={8} sm={9}>
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            fontWeight: 600, 
+                            color: '#000000',
+                            fontSize: { xs: '1rem', sm: '1.25rem' },
+                            mb: 1
+                          }}
+                        >
+                          {item.product?.title || 'Product'}
                         </Typography>
-                        {item.color && (
-                          <Typography variant="body2" color="#000000">
-                            Color: {item.color}
+                        
+                        <Stack direction="row" spacing={3} sx={{ mb: 2 }}>
+                          <Typography 
+                            variant="body1" 
+                            sx={{
+                              color: '#00503a',
+                              fontWeight: 500
+                            }}
+                          >
+                            Size: {item.size || 'N/A'}
                           </Typography>
-                        )}
-                        <Typography variant="body2" color="#000000">
-                          Qty: {item.quantity}
-                        </Typography>
-                      </Box>
-                      
-                      {/* Price Display */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, flexWrap: 'wrap' }}>
-                        <Typography variant="body1" sx={{ fontWeight: 500, color: '#000000', mr: 1 }}>
-                          Tk. {item.discountedPrice}
-                        </Typography>
-                        {item.price > item.discountedPrice && (
-                          <>
+                          {item.color && (
                             <Typography 
-                              variant="body2" 
-                              color="#666666" 
-                              sx={{ textDecoration: 'line-through', mr: 1 }}
+                              variant="body1" 
+                              sx={{
+                                color: '#00503a',
+                                fontWeight: 500
+                              }}
                             >
-                              Tk. {item.price}
+                              Color: {item.color}
                             </Typography>
-                            <Typography variant="body2" color="#000000">
-                              ({Math.round(((item.price - item.discountedPrice) / item.price) * 100)}% off)
-                            </Typography>
-                          </>
-                        )}
-                      </Box>
-                      
-                      {/* Item Total with Savings */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, flexWrap: 'wrap' }}>
-                        <Typography variant="body2" color="#000000" sx={{ mr: 1 }}>
-                          Item Total: Tk. {(item.discountedPrice * item.quantity).toFixed(2)}
-                        </Typography>
-                        {item.price > item.discountedPrice && (
-                          <Typography variant="body2" color="#000000">
-                            (Save Tk. {((item.price - item.discountedPrice) * item.quantity).toFixed(2)})
+                          )}
+                          <Typography 
+                            variant="body1" 
+                            sx={{
+                              color: '#00503a',
+                              fontWeight: 500
+                            }}
+                          >
+                            Qty: {item.quantity}
                           </Typography>
-                        )}
-                      </Box>
-                    </Box>
-                    
-                    {/* Item Total */}
-                    <Box sx={{ ml: 2, textAlign: 'right', minWidth: '80px' }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#000000' }}>
-                        Tk. {(item.discountedPrice * item.quantity).toFixed(2)}
-                      </Typography>
-                      {item.price > item.discountedPrice && (
-                        <Typography variant="body2" color="#000000">
-                          Save Tk. {((item.price - item.discountedPrice) * item.quantity).toFixed(2)}
+                        </Stack>
+                        
+                        {/* Price Display */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <Typography 
+                            variant="h6" 
+                            sx={{ 
+                              fontWeight: 600, 
+                              color: '#00503a'
+                            }}
+                          >
+                            ৳{(item.discountedPrice || 0).toFixed(2)}
+                          </Typography>
+                          {(item.price || 0) > (item.discountedPrice || 0) && (
+                            <>
+                              <Typography 
+                                variant="body1" 
+                                sx={{ 
+                                  textDecoration: 'line-through', 
+                                  ml: 2,
+                                  color: '#666666'
+                                }}
+                              >
+                                ৳{(item.price || 0).toFixed(2)}
+                              </Typography>
+                              <Typography 
+                                variant="body1" 
+                                sx={{ 
+                                  ml: 2,
+                                  color: '#00503a',
+                                  bgcolor: '#00503a15',
+                                  px: 1,
+                                  py: 0.5,
+                                  borderRadius: 1,
+                                  fontWeight: 500
+                                }}
+                              >
+                                {(item.price || 0) > 0 ? Math.round(((item.price || 0) - (item.discountedPrice || 0)) / (item.price || 0) * 100) : 0}% off
+                              </Typography>
+                            </>
+                          )}
+                        </Box>
+                        
+                        {/* Item Total */}
+                        <Typography 
+                          variant="subtitle1" 
+                          sx={{
+                            color: '#000000',
+                            fontWeight: 500
+                          }}
+                        >
+                          Total: ৳{((item.discountedPrice || 0) * (item.quantity || 1)).toFixed(2)}
+                          {(item.price || 0) > (item.discountedPrice || 0) && (
+                            <Typography 
+                              component="span" 
+                              variant="body1" 
+                              sx={{ 
+                                ml: 1,
+                                color: '#00503a',
+                                fontWeight: 500
+                              }}
+                            >
+                              (Save ৳{(((item.price || 0) - (item.discountedPrice || 0)) * (item.quantity || 1)).toFixed(2)})
+                            </Typography>
+                          )}
                         </Typography>
-                      )}
-                    </Box>
+                      </Grid>
+                    </Grid>
                   </Box>
                 ))}
               </Box>
@@ -509,107 +1104,19 @@ const OrderSummary = ({ handleNext }) => {
                 position: 'sticky',
                 top: 24,
                 bgcolor: '#ffffff',
-                borderColor: '#000000'
+                borderColor: '#00503a20',
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
+                }
               }}
             >
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3, color: '#000000' }}>
-                Price Details
-              </Typography>
-              
-              <Stack spacing={2}>
-                {/* Original Price */}
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography color="#000000">
-                    Original Price ({order.order.totalItem} {order.order.totalItem === 1 ? 'item' : 'items'})
-                  </Typography>
-                  <Typography color="#000000">Tk. {order.order.totalPrice.toFixed(2)}</Typography>
-                </Stack>
-                
-                {/* Product Discount */}
-                {order.order.productDiscount > 0 && (
-                  <Stack direction="row" justifyContent="space-between">
-                    <Box>
-                      <Typography color="#000000" sx={{ fontWeight: 500 }}>
-                        Product Discount
-                      </Typography>
-                      <Typography variant="caption" color="#000000">
-                        ({Math.round((order.order.productDiscount / order.order.totalPrice) * 100)}% off)
-                      </Typography>
-                    </Box>
-                    <Typography color="#000000" sx={{ fontWeight: 500 }}>
-                      -Tk. {order.order.productDiscount.toFixed(2)}
-                    </Typography>
-                  </Stack>
-                )}
-                
-                {/* Promo Code Discount */}
-                {order.order.promoCodeDiscount > 0 && (
-                  <Stack direction="row" justifyContent="space-between">
-                    <Box>
-                      <Typography color="#000000" sx={{ fontWeight: 500 }}>
-                        Coupon Discount
-                      </Typography>
-                      {order.order.promoDetails && (
-                        <Typography variant="caption" color="#000000">
-                          {order.order.promoDetails.code} ({order.order.promoDetails.discountType === 'PERCENTAGE' 
-                            ? `${order.order.promoDetails.discountAmount}%` 
-                            : `Tk. ${order.order.promoDetails.discountAmount}`})
-                        </Typography>
-                      )}
-                    </Box>
-                    <Typography color="#000000" sx={{ fontWeight: 500 }}>
-                      -Tk. {order.order.promoCodeDiscount.toFixed(2)}
-                    </Typography>
-                  </Stack>
-                )}
-                
-                {/* Delivery Charge */}
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography color="#000000">Delivery Charge</Typography>
-                  <Typography color="#000000">
-                    {order.order.deliveryCharge > 0 
-                      ? `Tk. ${order.order.deliveryCharge.toFixed(2)}` 
-                      : <Typography component="span" color="#000000">FREE</Typography>}
-                  </Typography>
-                </Stack>
-                
-                <Divider sx={{ bgcolor: '#000000' }} />
-                
-                {/* Total Savings */}
-                {(order.order.productDiscount > 0 || order.order.promoCodeDiscount > 0) && (
-                  <Box sx={{ 
-                    p: 1.5, 
-                    bgcolor: '#f5f5f5',
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: '#000000'
-                  }}>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="subtitle2" color="#000000" sx={{ fontWeight: 600 }}>
-                          Total Savings
-                        </Typography>
-                        <Typography variant="caption" color="#000000">
-                          {Math.round(((order.order.productDiscount + order.order.promoCodeDiscount) / order.order.totalPrice) * 100)}% off
-                        </Typography>
-                      </Box>
-                      <Typography variant="subtitle2" color="#000000" sx={{ fontWeight: 600 }}>
-                        Tk. {(order.order.productDiscount + order.order.promoCodeDiscount).toFixed(2)}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                )}
-                
-                {/* Final Amount */}
-                <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#000000' }}>
-                    Amount to Pay
-                  </Typography>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#000000' }}>
-                    Tk. {order.order.totalDiscountedPrice.toFixed(2)}
-                  </Typography>
-                </Stack>
-              </Stack>
+              {order.order && (
+                <PriceDetailsPanel 
+                  {...priceService.formatOrderPriceData(order.order, 'online')}
+                />
+              )}
               
               {/* Payment Button */}
               <Button
@@ -621,7 +1128,7 @@ const OrderSummary = ({ handleNext }) => {
                   mt: 4,
                   bgcolor: '#000000',
                   color: '#ffffff',
-                  '&:hover': { bgcolor: '#333333' },
+                  '&:hover': { bgcolor: '#00503a' },
                   py: 1.5
                 }}
               >

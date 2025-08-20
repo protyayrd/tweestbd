@@ -21,4 +21,17 @@ const getUserIdFromToken=(token)=>{
     }
 }
 
-module.exports={generateToken,getUserIdFromToken};
+const validateToken = async (token) => {
+    try {
+        // Verify the token is valid and not expired
+        const decodedToken = jwt.verify(token, SECRET_KEY);
+        
+        // If we got here, token is valid
+        return true;
+    } catch (error) {
+        console.error("Token validation failed:", error.message);
+        return false;
+    }
+}
+
+module.exports={generateToken, getUserIdFromToken, validateToken};

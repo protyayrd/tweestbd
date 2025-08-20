@@ -1,0 +1,20 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shopping bag -->
+  <path d="M60 40H140L150 180H50L60 40Z" fill="#f2f2f2" stroke="#e0e0e0" stroke-width="4"/>
+  <path d="M70 40C70 30 75 20 100 20C125 20 130 30 130 40" stroke="#e0e0e0" stroke-width="4"/>
+  
+  <!-- Empty box inside bag -->
+  <rect x="75" y="70" width="50" height="50" rx="4" fill="#eeeeee" stroke="#cccccc" stroke-width="2"/>
+  <path d="M85 95H115" stroke="#cccccc" stroke-width="2"/>
+  <path d="M85 85H115" stroke="#cccccc" stroke-width="2"/>
+  <path d="M85 105H115" stroke="#cccccc" stroke-width="2"/>
+  
+  <!-- Order paper -->
+  <rect x="65" y="135" width="70" height="25" rx="2" fill="white" stroke="#cccccc" stroke-width="2"/>
+  <path d="M75 145H125" stroke="#cccccc" stroke-width="2"/>
+  <path d="M75 155H115" stroke="#cccccc" stroke-width="2"/>
+  
+  <!-- Crossed out circle -->
+  <circle cx="100" cy="70" r="30" fill="#f8f8f8" stroke="#e0e0e0" stroke-width="2"/>
+  <path d="M80 70L120 70" stroke="#cccccc" stroke-width="3"/>
+</svg> 

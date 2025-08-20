@@ -1,10 +1,14 @@
 import axios from 'axios';
+import { API_URL } from './api';
 import { mockCartResponses } from '../mocks/cartApi';
 
 // Create a new instance of axios for mock API
 const mockApi = axios.create({
-  baseURL: 'http://localhost:5454',
-  timeout: 10000,
+  baseURL: API_URL,
+  timeout: 5000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
 // Mock size guide data

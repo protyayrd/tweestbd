@@ -6,9 +6,29 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  slug: {
+    type: String,
+    unique: true,
+  },
   description: {
     type: String,
     required: true,
+  },
+  sku: {
+    type: String,
+    required: false,
+  },
+  features: {
+    type: String,
+    required: false,
+  },
+  perfectFor: {
+    type: String,
+    required: false,
+  },
+  additionalInfo: {
+    type: String,
+    required: false,
   },
   price: {
     type: Number,
@@ -57,12 +77,10 @@ const productSchema = new mongoose.Schema({
     required: false,
     default: null
   },
-  ratings: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'ratings',
-    },
-  ], 
+  ratings: {
+    type: Number,
+    default: 0,
+  }, 
   reviews: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -88,8 +106,19 @@ const productSchema = new mongoose.Schema({
   },
 });
 
-// Add a pre-save middleware to ensure discountedPrice is less than or equal to price
+// Generate slug from title or SKU before saving
 productSchema.pre('save', function(next) {
+  // Generate slug if it doesn't exist or title/sku has changed
+  if (!this.slug || this.isModified('title') || this.isModified('sku')) {
+    // Prefer using SKU if available, otherwise use title
+    const baseText = this.sku || this.title;
+    this.slug = baseText
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
+  
+  // Continue with existing validation
   if (this.discountedPrice > this.price) {
     next(new Error('Discounted price cannot be greater than regular price'));
   }

@@ -1,10 +1,9 @@
 import React from "react";
 import { Avatar } from "@mui/material";
-import { Rating, Box, Typography, Grid } from "@mui/material";
+import { Rating, Box, Typography, Grid, Chip } from "@mui/material";
+import VerifiedIcon from '@mui/icons-material/Verified';
 
 const ProductReviewCard = ({item}) => {
-  const [value, setValue] = React.useState(item?.rating || 4.5);
-  
   // Handle case where user might be undefined
   const userName = item?.user?.firstName || 'Anonymous';
   const userInitial = userName !== 'Anonymous' ? userName[0].toUpperCase() : 'A';
@@ -26,27 +25,36 @@ const ProductReviewCard = ({item}) => {
         </Grid>
         <Grid item xs={9}>
           <div className="space-y-2">
-            <div className="">
+            <div className="flex items-center">
               <p className="font-semibold text-lg">{userName}</p>
-              <p className="opacity-70">
-                {item?.createdAt 
-                  ? new Date(item.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })
-                  : 'Recent review'
-                }
-              </p>
+              {item?.verifiedPurchase && (
+                <Chip 
+                  icon={<VerifiedIcon style={{ color: '#4CAF50' }} />}
+                  label="Verified Purchase" 
+                  size="small"
+                  variant="outlined"
+                  style={{ 
+                    marginLeft: 10, 
+                    borderColor: '#4CAF50', 
+                    color: '#4CAF50',
+                    fontWeight: 'bold'
+                  }}
+                />
+              )}
             </div>
+            <p className="opacity-70">
+              {item?.createdAt 
+                ? new Date(item.createdAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })
+                : 'Recent review'
+              }
+            </p>
             <div>
               <Rating
-                value={value}
-                onChange={(event, newValue) => {
-                  setValue(newValue);
-                }}
-                name="half-rating"
-                defaultValue={2.5}
+                value={item?.rating || 5}
                 precision={0.5}
                 readOnly
               />

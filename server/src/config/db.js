@@ -1,6 +1,7 @@
 const mongoose = require("mongoose")
+require('dotenv').config()
 
-const mongoDbUrl='mongodb://127.0.0.1:27017/tweestbd'
+const mongoDbUrl = process.env.MONGODB_URL
 
 const connectDb = async () => {
     try {

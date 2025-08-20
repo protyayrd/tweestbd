@@ -1,12 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Box, Typography, Button, Container, CircularProgress } from '@mui/material';
+import { Box, Typography, Button, Container, CircularProgress, styled } from '@mui/material';
 import { getCategories } from '../../../Redux/Admin/Category/Action';
 import { motion } from 'framer-motion';
 
+// Styled component for consistent image display across devices
+const StyledImageContainer = styled(Box)({
+  position: 'relative',
+  width: '100%',
+  height: '100%',
+  overflow: 'hidden',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  '& img': {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    objectPosition: 'center center',
+    display: 'block',
+    margin: '0 auto',
+  }
+});
+
 const ComingSoonCategory = () => {
-  const { categoryId } = useParams();
+  const { param: categoryParam } = useParams(); // Unified parameter for slug or ID
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
@@ -21,9 +40,8 @@ const ComingSoonCategory = () => {
 
   useEffect(() => {
     if (categories?.length && !loading) {
-      const category = categories.find(cat => cat._id === categoryId);
+      const category = categories.find(cat => cat.slug === categoryParam) || categories.find(cat => cat._id === categoryParam);
       if (!category) {
-        console.log('Category not found, redirecting to home');
         navigate('/');
         return;
       }
@@ -34,49 +52,47 @@ const ComingSoonCategory = () => {
       if (isLevel2) {
         // Check for level 3 subcategories
         const hasLevel3Categories = categories.some(cat => 
-          cat.level === 3 && cat.parentCategory?._id === categoryId
+          cat.level === 3 && cat.parentCategory?._id === category._id
         );
 
         // Log for debugging
-        console.log('ComingSoonCategory Check (Level 2):', {
-          categoryId,
+        console.log('Category navigation details:', {
+          categoryId: category._id,
           categoryName: category.name,
           level: category.level,
           hasLevel3Categories,
           parentCategory: category.parentCategory
         });
 
-        if (hasLevel3Categories) {
-          console.log('Level 2 category has level 3 subcategories, redirecting to category page');
-          navigate(`/category/${categoryId}`);
-          return;
-        }
+                        if (hasLevel3Categories) {
+                  navigate(`/category/${category.slug || category._id}`);
+                  return;
+                }
       } else {
         // For level 1 categories, check for level 2 subcategories
         const hasLevel2Categories = categories
           .filter(cat => cat.level === 2)
-          .some(cat => cat.parentCategory?._id === categoryId);
+          .some(cat => cat.parentCategory?._id === category._id);
 
         // Log for debugging
-        console.log('ComingSoonCategory Check (Level 1):', {
-          categoryId,
+        console.log('Level 1 category navigation:', {
+          categoryId: category._id,
           categoryName: category.name,
           level: category.level,
           hasLevel2Categories
         });
 
-        if (hasLevel2Categories) {
-          console.log('Level 1 category has subcategories, redirecting to category page');
-          navigate(`/category/${categoryId}`);
-          return;
-        }
+                        if (hasLevel2Categories) {
+                  navigate(`/category/${category.slug || category._id}`);
+                  return;
+                }
       }
 
       setIsLoading(false);
     }
-  }, [categories, categoryId, navigate, loading]);
+  }, [categories, categoryParam, navigate, loading]);
 
-  const category = categories?.find(cat => cat._id === categoryId);
+  const category = categories?.find(cat => cat.slug === categoryParam) || categories?.find(cat => cat._id === categoryParam);
 
   if (isLoading) {
     return (

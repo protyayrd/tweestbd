@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { getAllOrders } from '../../actions/orderActions';
 import { TableCell, Typography, Grid, Paper, Box, Chip } from '@mui/material';
+import { API_URL } from '../../../config/api';
 
 const OrdersTable = () => {
   const dispatch = useDispatch();
@@ -23,7 +24,7 @@ const OrdersTable = () => {
 
   const fetchOrderDetails = async (orderId) => {
     try {
-      const response = await fetch(`http://localhost:5454/api/orders/${orderId}`, {
+      const response = await fetch(`${API_URL}/api/orders/${orderId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwt')}`,
           'Content-Type': 'application/json'
@@ -44,6 +45,22 @@ const OrdersTable = () => {
       fetchOrderDetails(order._id);
     });
   }, [orders]);
+
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await fetch(`${API_URL}/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('jwt')}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      // ... rest of the code
+    } catch (error) {
+      console.error('Error updating order status:', error);
+    }
+  };
 
   return (
     <TableCell>

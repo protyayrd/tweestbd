@@ -1,33 +1,207 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn-BD">
   <head>
+    <!-- Google Tag Manager - deferred injection to reduce render delay -->
+    <script>
+      (function(){
+        function injectGTM(){
+          try{
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({ 'gtm.start': new Date().getTime(), event:'gtm.js' });
+            var s=document.createElement('script');
+            s.async=true; s.defer=true; s.src='https://ss.tweestbd.com/gtm.js?id=GTM-KZR2X9P2';
+            var f=document.getElementsByTagName('script')[0];
+            f.parentNode.insertBefore(s,f);
+          }catch(e){}
+        }
+        if('requestIdleCallback' in window){
+          requestIdleCallback(injectGTM, { timeout: 5000 });
+        }else{
+          window.addEventListener('load', function(){ setTimeout(injectGTM, 1500); });
+        }
+      })();
+    </script>
+    <!-- End Google Tag Manager -->
+
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/images/TWEEST13.png" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/images/TWEEST13.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Tweest BD - Be The Change"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/images/TWEEST13.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
+    
+    <!-- Permissions Policy to suppress browser feature warnings -->
+    <meta http-equiv="Permissions-Policy" content="attribution-reporting=(), browsing-topics=(), interest-cohort=()" />
+    
+    <!-- Additional security headers -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <!-- X-Frame-Options should be set via HTTP header, not meta tag -->
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    
+    <!-- Primary Meta Tags -->
+    <title>Tweest - Be The Change</title>
+    <meta name="title" content="Tweest - Be The Change">
+    <meta name="description" content="Tweest is Bangladesh's premier platform for social innovation and community engagement. Join us to create meaningful impact, connect with change-makers, and transform ideas into action. Features include community projects, social initiatives, and collaborative opportunities.">
+    <meta name="keywords" content="Tweest, Bangladesh social platform, community development Bangladesh, social innovation Dhaka, NGO Bangladesh, social enterprise BD, community projects Bangladesh, change makers Bangladesh, social impact platform, digital transformation Bangladesh, youth empowerment, sustainable development, social change, community engagement, Bengali social network, Bangladesh startup">
+    <meta name="author" content="Tweest">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="geo.region" content="BD" />
+    <meta name="geo.placename" content="Dhaka" />
+    <meta name="geo.position" content="23.8103;90.4125" />
+    <meta name="ICBM" content="23.8103, 90.4125" />
+    <meta name="language" content="Bengali, English">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tweestbd.com/">
+    <meta property="og:site_name" content="Tweest BD">
+    <meta property="og:title" content="Tweest - Be The Change">
+    <meta property="og:description" content="Tweest is Bangladesh's premier platform for social innovation and community engagement. Join us to create meaningful impact, connect with change-makers, and transform ideas into action.">
+    <meta property="og:image" content="https://tweestbd.com/images/TWEEST13.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:locale" content="bn_BD">
+    <meta property="og:locale:alternate" content="en_US">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://tweestbd.com/">
+    <meta property="twitter:site" content="@tweestbd">
+    <meta property="twitter:title" content="Tweest - Leading Community Platform for Social Change in Bangladesh">
+    <meta property="twitter:description" content="Tweest is Bangladesh's premier platform for social innovation and community engagement. Join us to create meaningful impact, connect with change-makers, and transform ideas into action.">
+    <meta property="twitter:image" content="https://tweestbd.com/images/TWEEST13.png">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Tweest",
+      "alternateName": "Tweest",
+      "url": "https://tweestbd.com",
+      "logo": "https://tweestbd.com/images/TWEEST13.png",
+      "sameAs": [
+        "https://facebook.com/tweestbd",
+        "https://twitter.com/tweestbd",
+        "https://instagram.com/tweestbd",
+        "https://linkedin.com/company/tweestbd"
+      ],
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "BD",
+        "addressRegion": "Dhaka"
+      },
+      "description": "Tweest is Bangladesh's premier platform for social innovation and community engagement.",
+      "areaServed": "Bangladesh"
+    }
+    </script>
 
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>Tweest</title>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Tweest BD",
+      "url": "https://tweestbd.com",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://tweestbd.com/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/images/TWEEST13.png" />
+
+    
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://tweestbd.com/" />
+    <!-- Alternate language versions -->
+    <link rel="alternate" href="https://tweestbd.com" hreflang="bn-BD" />
+    <link rel="alternate" href="https://tweestbd.com/" hreflang="en" />
+    
+    <!-- Resource Hints: Preconnect, Prefetch, Preload for critical assets -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Font preload removed to prevent unused resource warning -->
+    <!-- <link rel="preload" href="%PUBLIC_URL%/fonts/NotoSansBengali-Regular.ttf" as="font" type="font/ttf" crossorigin> -->
+    <!-- Preload critical CSS to reduce render blocking -->
+    <link rel="preload" href="%PUBLIC_URL%/static/css/main.e6400f3f.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="%PUBLIC_URL%/static/css/main.e6400f3f.css"></noscript>
+
+    
+    <!-- DNS prefetch to speed up external resource resolution -->
+    <link rel="dns-prefetch" href="//connect.facebook.net">
+    <link rel="dns-prefetch" href="//www.facebook.com">
+    <link rel="dns-prefetch" href="//scripts.clarity.ms">
+    <link rel="dns-prefetch" href="//tweestbd.com">
+    
+    <!-- Preconnect to image/CDN origins to reduce connection setup time for hero image -->
+    <link rel="preconnect" href="https://tweestbd.com" crossorigin>
+    
+    <!-- Preload/inject critical assets only on specific pages -->
+    <script>
+      (function(){
+        var isHome = (window.location.pathname === '/' || window.location.pathname === '/home');
+        if (isHome) {
+          // Preload logo
+          var logoPreload = document.createElement('link');
+          logoPreload.rel = 'preload';
+          logoPreload.href = '%PUBLIC_URL%/images/TWEEST13.png';
+          logoPreload.as = 'image';
+          logoPreload.type = 'image/png';
+          document.head.appendChild(logoPreload);
+
+          // Preload LCP hero image
+          var heroPreload = document.createElement('link');
+          heroPreload.rel = 'preload';
+          heroPreload.as = 'image';
+          heroPreload.href = 'https://tweestbd.com/uploads/categories/compressed/TAS01379.webp';
+          heroPreload.setAttribute('imagesrcset', 'https://tweestbd.com/uploads/categories/compressed/TAS01379.webp 1200w, https://tweestbd.com/uploads/categories/compressed/TAS01379.webp 1920w');
+          heroPreload.setAttribute('imagesizes', '(max-width: 768px) 100vw, 100vw');
+          document.head.appendChild(heroPreload);
+
+          // Inject lightweight prerender hero before app mounts
+          document.addEventListener('DOMContentLoaded', function(){
+            var style = document.createElement('style');
+            style.textContent = '#hero-prerender{position:relative;width:100%;height:100vh;overflow:hidden}#hero-prerender img{width:100%;height:100%;object-fit:cover;display:block}@media(max-width:768px){#hero-prerender{height:450px}}';
+            document.head.appendChild(style);
+            var heroHtml = '\n<div id="hero-prerender" aria-hidden="true">\n  <img src="https://tweestbd.com/uploads/categories/compressed/TAS01379.webp" alt="Polo Shirt" loading="eager" fetchpriority="high" decoding="async" width="1920" height="1080" />\n</div>\n';
+            document.body.insertAdjacentHTML('afterbegin', heroHtml);
+          });
+        }
+        // Removed dynamic preload for non-existent main-font.woff2 to avoid 404 and layout thrash
+      })();
+    </script>
+    
+    <!-- Prefetch important pages for faster navigation -->
+    <link rel="prefetch" href="/">
+    <link rel="prefetch" href="/products">
+    <link rel="prefetch" href="/about">
   </head>
-  <body>
+  <body itemscope itemtype="https://schema.org/WebPage">
+    <!-- Prerendered Hero is injected only on homepage via script above -->
+    <!-- Suppress Facebook Pixel privacy API warnings -->
+    <script>
+      // Suppress console warnings for unsupported privacy features
+      const originalConsoleWarn = console.warn;
+      console.warn = function(...args) {
+        const message = args.join(' ');
+        // Filter out specific Facebook Pixel privacy API warnings
+        if (message.includes('Unrecognized feature:') && 
+            (message.includes('attribution-reporting') || 
+             message.includes('browsing-topics') || 
+             message.includes('interest-cohort'))) {
+          return; // Don't log these warnings
+        }
+        // Log all other warnings normally
+        originalConsoleWarn.apply(console, args);
+      };
+    </script>
+    
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://ss.tweestbd.com/ns.html?id=GTM-KZR2X9P2" height="0" width="0" style="display:none;visibility:hidden" loading="lazy"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
     <!--
@@ -40,7 +214,20 @@
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
+    
+    <!-- Service Worker Registration for Performance -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js')
+            .then(function(registration) {
+              console.log('SW registered: ', registration);
+            })
+            .catch(function(registrationError) {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
-
-<script src="https://unpkg.com/flowbite@1.4.0/dist/flowbite.js"></script>

@@ -11,6 +11,9 @@ const cartItemSchema = new mongoose.Schema({
     ref: 'products',
     required: true,
   },
+  sku: {
+    type: String,
+  },
   size: {
     type: String,
     required: true,
@@ -72,9 +75,13 @@ const cartItemSchema = new mongoose.Schema({
           promoCodeDiscount: promoDiscount,
           promoDetails: doc.cart?.promoDetails
         },
-        product: ret.product,
+        product: ret.product ? {
+          ...ret.product,
+          colors: ret.product.colors || []
+        } : null,
         size: ret.size,
         color: ret.color,
+        sku: ret.sku || ret.product?.sku || null,
         quantity: ret.quantity,
         userId: ret.userId,
         price: originalPrice,

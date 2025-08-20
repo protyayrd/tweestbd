@@ -12,614 +12,788 @@ import {
   Alert,
   Snackbar,
   FormControlLabel,
-  Switch
+  Switch,
+  FormControl,
+  InputLabel,
+  Select,
+  Card,
+  CardContent,
+  CardActions,
+  RadioGroup,
+  Radio,
+  Badge,
+  Chip,
+  useMediaQuery,
+  useTheme
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { createOrder } from "../../../Redux/Customers/Order/Action";
-import AddressCard from "../adreess/AdreessCard";
 import { useState, useEffect } from "react";
-import axios from "axios";
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import HomeIcon from '@mui/icons-material/Home';
 import PhoneIcon from '@mui/icons-material/Phone';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import pathaoService from '../../../services/pathaoService';
 
-const baseURL = "https://bdapis.com/api/v1.2";
+// Updated colors: 00503a (dark green), 69af5a (medium green), e1ffe3 (light green), and B&W
+const PRIMARY_COLOR = '#00503a';
+const SECONDARY_COLOR = '#69af5a';
+const LIGHT_COLOR = '#e1ffe3';
 
 const commonTextFieldStyles = {
   '& .MuiOutlinedInput-root': { 
     '&.Mui-focused fieldset': { 
-      borderColor: '#000000' 
+      borderColor: SECONDARY_COLOR // #69af5a (medium green)
     },
     '&:hover fieldset': {
-      borderColor: '#000000'
+      borderColor: SECONDARY_COLOR 
+    },
+    // Add text color for input
+    '& input': {
+      color: PRIMARY_COLOR // #00503a (dark green)
+    },
+    // For multiline inputs
+    '& textarea': {
+      color: PRIMARY_COLOR // #00503a (dark green)
     }
   },
-  '& .MuiInputLabel-root.Mui-focused': {
-    color: '#000000'
+  '& .MuiInputLabel-root': {
+    color: PRIMARY_COLOR, // #00503a (dark green) for all labels
+    '&.Mui-focused': {
+      color: SECONDARY_COLOR // #69af5a (medium green) when focused
+    }
   }
 };
 
-export default function AddDeliveryAddressForm({ handleNext }) {
+export default function AddDeliveryAddressForm({ handleNext, isGuestCheckout }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const jwt = localStorage.getItem("jwt");
   const { auth } = useSelector((store) => store);
   const { cart } = useSelector((store) => store);
-  const [selectedAddress, setSelectedAdress] = useState(null);
   
+  // States for saved addresses
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
+  
+  // Use the prop value to determine if this is a guest checkout
+  // Fall back to checking if auth.user exists
+  const [isGuest, setIsGuest] = useState(isGuestCheckout || !auth?.user);
+
+  // If using guest checkout, always show the form
+  useEffect(() => {
+    if (isGuest || isGuestCheckout) {
+      setShowNewAddressForm(true);
+    }
+  }, [isGuest, isGuestCheckout]);
+
   // Location states
-  const [divisions, setDivisions] = useState([]);
-  const [districts, setDistricts] = useState([]);
-  const [upazillas, setUpazillas] = useState([]);
-  const [selectedDivision, setSelectedDivision] = useState("");
-  const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [selectedUpazilla, setSelectedUpazilla] = useState("");
+  const [cities, setCities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [manualInput, setManualInput] = useState(false);
-  const [apiError, setApiError] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [formValues, setFormValues] = useState({
+    name: '',
+    phoneNumber: '',
+    address: '',
+    zipCode: '1212' // Default Dhaka zip code
+  });
+  const [saveAddress, setSaveAddress] = useState(true);
 
-  // Fetch divisions on component mount
+  // Get selected address object
+  const selectedAddress = savedAddresses.find(addr => addr.clientId === selectedAddressId || addr.id === selectedAddressId);
+
+  // Load saved addresses from localStorage
   useEffect(() => {
-    const fetchDivisions = async () => {
+    const loadSavedAddresses = () => {
       try {
-        setLoading(true);
-        const response = await axios.get(`${baseURL}/divisions`);
-        console.log("Divisions API response:", response.data);
-        if (response.data && response.data.data) {
-          const formattedDivisions = response.data.data.map(div => ({
-            division: div.division || "",
-            divisionbn: div.divisionbn || div.division || ""
-          })).filter(div => div.division && div.division !== "undefined");
+        // Retrieve saved addresses from localStorage
+        const savedAddressesString = localStorage.getItem('savedAddresses');
+        
+        if (savedAddressesString) {
+          const addresses = JSON.parse(savedAddressesString);
           
-          console.log("Formatted divisions:", formattedDivisions);
-          setDivisions(formattedDivisions);
-          setApiError(false);
+          // Ensure each address has a unique ID (backward compatibility handling)
+          const addressesWithIds = addresses.map((addr, index) => ({
+            ...addr,
+            clientId: addr.clientId || addr.id || `addr-${index}-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`
+          }));
+          
+          setSavedAddresses(addressesWithIds);
+          
+          // If addresses exist but no address is selected, select the first one
+          if (addressesWithIds.length > 0 && !selectedAddressId) {
+            setSelectedAddressId(addressesWithIds[0].clientId || addressesWithIds[0].id);
+          } else {
+            // If no addresses, show the new address form
+            setShowNewAddressForm(addressesWithIds.length === 0);
+          }
+        } else {
+          // If no saved addresses, show the form by default
+          setShowNewAddressForm(true);
         }
       } catch (error) {
-        console.error("Error fetching divisions:", error);
-        setApiError(true);
-        setError("Failed to fetch locations. You can use manual input.");
-      } finally {
-        setLoading(false);
+        console.error('Error loading saved addresses:', error);
+        setShowNewAddressForm(true);
       }
     };
-    fetchDivisions();
-  }, []);
 
-  // Fetch districts when division changes
+    loadSavedAddresses();
+    
+    // If user is logged in, pre-fill the form with their info
+    if (auth?.user) {
+      setFormValues(prev => ({
+        ...prev,
+        name: auth.user.firstName || '',
+        phoneNumber: auth.user.phoneNumber || '',
+      }));
+    }
+  }, [auth?.user]);
+
+  // Initialize Pathao service and fetch cities - optimize to prevent excessive API calls
   useEffect(() => {
-    const fetchDistricts = async () => {
-      if (!selectedDivision) return;
+    const initializePathao = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${baseURL}/division/${selectedDivision}`);
-        if (response.data && response.data.data) {
-          // Ensure districts data is properly formatted
-          const formattedDistricts = response.data.data.map(dist => ({
-            district: dist.district,
-            upazilla: dist.upazilla || []
-          }));
-          setDistricts(formattedDistricts);
-          setSelectedDistrict("");
-          setUpazillas([]);
-          setPostalCode("");
-          setApiError(false);
+        setError("");
+        
+        // Clear cache on guest checkout to ensure fresh data
+        if (isGuestCheckout) {
+          // Clear pathao service cache to ensure fresh data
+          pathaoService.clearCache();
         }
+        
+        console.log('Fetching Pathao cities for checkout');
+        const citiesData = await pathaoService.getCities().catch(error => {
+          console.error('Error in pathaoService.getCities:', error);
+          throw new Error('Could not load delivery locations. Please refresh the page.');
+        });
+        
+        // Reset selections when cities change
+        setSelectedCity("");
+        
+        // Set the cities data
+        setCities(citiesData);
       } catch (error) {
-        console.error("Error fetching districts:", error);
-        setApiError(true);
-        setError("Failed to fetch districts. You can use manual input.");
+        console.error('Error initializing Pathao:', error);
+        setCities([]);
+        setError('Failed to load delivery locations. Please refresh the page.');
+        setSnackbar({
+          open: true,
+          message: 'Failed to load delivery locations. Please refresh the page.',
+          severity: 'error'
+        });
       } finally {
         setLoading(false);
       }
     };
-    if (!manualInput) {
-      fetchDistricts();
-    }
-  }, [selectedDivision, manualInput]);
 
-  // Update upazillas when district changes
-  useEffect(() => {
-    if (!selectedDistrict || !districts.length || manualInput) return;
-    const district = districts.find(d => d.district === selectedDistrict);
-    if (district && Array.isArray(district.upazilla)) {
-      setUpazillas(district.upazilla);
-      fetchPostalCode(selectedDistrict);
-    }
-  }, [selectedDistrict, districts, manualInput]);
+    // Only initialize once on component mount or when isGuestCheckout changes
+    initializePathao();
+  }, [isGuestCheckout]);
 
-  const fetchPostalCode = async (district) => {
-    try {
-      const mockPostalCodes = {
-        'Dhaka': '1200',
-        'Chittagong': '4000',
-        'Sylhet': '3100',
-        'Rajshahi': '6000',
-        'Khulna': '9000',
-        'Barisal': '8200',
-        'Rangpur': '5400',
-        'Mymensingh': '2200'
-      };
-      setPostalCode(mockPostalCodes[district] || '');
-    } catch (error) {
-      console.error('Error fetching postal code:', error);
-    }
-  };
+
 
   const handleSubmit = async (event) => {
-    event.preventDefault();
+    if (event) event.preventDefault();
     setLoading(true);
-    const data = new FormData(event.currentTarget);
+    setError("");
 
-    if (!cart.cartItems || cart.cartItems.length === 0) {
+    // Check cart items for both regular and guest checkout
+    let cartItems = [];
+    
+    if (isGuestCheckout || !jwt) {
+      // For guest checkout, get cart items from localStorage
+      try {
+        const guestCartItems = localStorage.getItem('guestCartItems');
+        const guestCart = localStorage.getItem('guestCart');
+        
+        if (guestCartItems) {
+          cartItems = JSON.parse(guestCartItems);
+        } else if (guestCart) {
+          const cartData = JSON.parse(guestCart);
+          cartItems = cartData.cartItems || [];
+        }
+      } catch (error) {
+        console.error('Error parsing guest cart data:', error);
+      }
+    } else {
+      // For logged in users, use Redux cart
+      cartItems = cart.cartItems || [];
+    }
+
+    if (!cartItems || cartItems.length === 0) {
       setError("Your cart is empty. Please add items to cart first.");
       setLoading(false);
       return;
     }
 
-    // Prepare address data with proper validation
-    const addressData = {
-      firstName: data.get("firstName")?.trim() || "",
-      lastName: data.get("lastName")?.trim() || "",
-      streetAddress: data.get("address")?.trim() || "",
-      division: manualInput ? data.get("manualDivision")?.trim() : selectedDivision,
-      district: manualInput ? data.get("manualDistrict")?.trim() : selectedDistrict,
-      upazilla: manualInput ? data.get("manualUpazilla")?.trim() : selectedUpazilla,
-      zipCode: postalCode || data.get("zip")?.trim() || "",
-      mobile: data.get("phoneNumber")?.trim() || "",
-    };
-
-    // Validate that no field is undefined or empty
-    const requiredFields = Object.entries(addressData);
-    const emptyFields = requiredFields.filter(([key, value]) => !value || value === "undefined");
-    
-    if (emptyFields.length > 0) {
-      setError(`Please fill in all required fields: ${emptyFields.map(([key]) => key).join(', ')}`);
-      setLoading(false);
-      return;
-    }
-
-    const orderData = {
-      address: addressData,
-      orderItems: cart.cartItems.map(item => ({
-        product: item.product?._id || item.productId,
-        quantity: item.quantity,
-        price: item.product?.price || item.price,
-        discountedPrice: item.product?.discountedPrice || item.discountedPrice,
-        size: item.size,
-        color: item.color || "default"
-      })),
-      totalPrice: cart.totalPrice,
-      totalDiscountedPrice: cart.totalDiscountedPrice,
-      discount: cart.discount,
-      productDiscount: cart.discount - (cart.promoCodeDiscount || 0),
-      promoCodeDiscount: cart.promoCodeDiscount || 0,
-      promoDetails: cart.promoDetails || {
-        code: null,
-        discountType: null,
-        discountAmount: 0,
-        maxDiscountAmount: null
-      },
-      totalItem: cart.totalItem,
-    };
-
     try {
-      console.log("Submitting order data:", orderData);
-      const response = await dispatch(createOrder({ ...orderData, jwt, navigate }));
-      if (response?.payload?._id) {
+      // If using a saved address, use that instead of form data
+      if (selectedAddressId && !showNewAddressForm) {
+        if (!selectedAddress) {
+          throw new Error("Selected address not found");
+        }
+        
+        // Verify the selected address has city data
+        if (!selectedAddress.city) {
+          throw new Error("Selected address is missing city information. Please select or create another address.");
+        }
+        
+        // Add isGuestCheckout flag if user is not logged in
+        const addressToSave = {
+          ...selectedAddress,
+          isGuestCheckout: isGuestCheckout || (!jwt && isGuest)
+        };
+        
+        // Ensure no fallback fields exist
+        delete addressToSave.division;
+        delete addressToSave.district;
+        delete addressToSave.upazilla;
+        
+        console.log('Using saved address with Pathao data:', addressToSave);
+        localStorage.setItem('selectedAddress', JSON.stringify(addressToSave));
+        
+        // For guest checkout, also store in guestAddress for the OrderSummary component
+        if (isGuestCheckout || (!jwt && isGuest)) {
+          localStorage.setItem('guestAddress', JSON.stringify(addressToSave));
+        }
+        
+        setLoading(false);
         handleNext();
-      } else {
-        setError("Failed to create order. Please try again.");
+        return;
       }
+      
+      // Handle new address form submission
+      const formData = new FormData(event.target);
+      
+      // Allow null strings, just get the values
+      const name = formData.get('name') || '';
+      const phoneNumber = formData.get('phoneNumber') || '';
+      const address = formData.get('address') || '';
+
+      // Get location information from API selection - require only city
+      if (!selectedCity) {
+        throw new Error("Please select a city");
+      }
+      
+      // Find the selected city name
+      const city = cities.find(c => c.city_id === selectedCity)?.city_name;
+      
+      // Verify city data was found
+      if (!city) {
+        throw new Error("Invalid city selection. Please try again.");
+      }
+      
+      // Store Pathao ID
+      const pathao_city_id = selectedCity;
+
+      // Create address object with consistent field structure - use only city
+      const newAddress = {
+        // Use a UUID format that won't be mistaken for MongoDB ObjectId
+        clientId: `addr-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
+        firstName: name.split(' ')[0],
+        lastName: name.split(' ').slice(1).join(' ') || '',
+        name, // Keep name for UI display
+        phoneNumber,
+        streetAddress: address,
+        mobile: phoneNumber,
+        // Location fields - use city for all location fields
+        city,
+        zone: city, // Use city as zone since we no longer collect zone
+        area: city, // Use city as area since we no longer collect area
+        // Store API ID for pathao
+        pathao_city_id,
+        pathao_zone_id: null,
+        pathao_area_id: null,
+        zipCode: "1212", // Default Dhaka zip code
+        // Add guest checkout flag
+        isGuestCheckout: isGuestCheckout || (!jwt && isGuest),
+        email: formData.get('email') || '' // Optional email for guest checkout
+      };
+
+      // Save to localStorage if requested and not guest checkout
+      if (saveAddress && (!isGuest || auth?.user)) {
+        const updatedAddresses = [...savedAddresses, newAddress];
+        localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
+        setSavedAddresses(updatedAddresses);
+        setSnackbar({
+          open: true,
+          message: 'Address saved successfully!',
+          severity: 'success'
+        });
+      }
+
+      // Store selected address for next steps - create a clean copy without clientId
+      const addressForServer = { ...newAddress };
+      delete addressForServer.clientId; // Remove client-only field before sending to server
+      
+      // Ensure no fallback fields exist
+      delete addressForServer.division;
+      delete addressForServer.district;
+      delete addressForServer.upazilla;
+      
+      console.log('Saving address with Pathao data:', addressForServer);
+      localStorage.setItem('selectedAddress', JSON.stringify(addressForServer));
+      
+      // For guest checkout, also store in guestAddress for the OrderSummary component
+      if (isGuestCheckout || (!jwt && isGuest)) {
+        localStorage.setItem('guestAddress', JSON.stringify(addressForServer));
+      }
+      
+      setLoading(false);
+      handleNext();
     } catch (error) {
-      console.error("Order creation error:", error);
-      const errorMessage = typeof error.response?.data === 'string' 
-        ? error.response.data 
-        : error.response?.data?.message 
-        || "Failed to create order. Please try again.";
-      setError(errorMessage);
-    } finally {
+      console.error('Error handling address:', error);
+      setError(error.message || "An error occurred. Please try again.");
       setLoading(false);
     }
   };
 
-  const handleSelectAddress = (item) => {
-    // Store the selected address in local storage or state for use in the next step
-    localStorage.setItem("selectedAddress", JSON.stringify(item));
-    // Move to the next step
-    handleNext();
+  const handleSnackbarClose = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
-  const toggleManualInput = () => {
-    setManualInput(!manualInput);
-    // Reset values when switching modes
-    setSelectedDivision("");
-    setSelectedDistrict("");
-    setSelectedUpazilla("");
-    setPostalCode("");
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormValues(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleAddressSelection = (addressId) => {
+    setSelectedAddressId(addressId);
+    setShowNewAddressForm(false);
+  };
+
+  const handleAddNewAddress = () => {
+    setSelectedAddressId(null);
+    setShowNewAddressForm(true);
+  };
+
+  const renderSavedAddresses = () => {
+    if (savedAddresses.length === 0) {
+      return (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="body1" color="text.secondary">
+            No saved addresses found
+          </Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <Box sx={{ mb: 2 }}>
+        <RadioGroup 
+          value={selectedAddressId || ''}
+          onChange={(e) => handleAddressSelection(e.target.value)}
+        >
+          <Grid container spacing={2}>
+            {savedAddresses.map((address) => (
+              <Grid item xs={12} sm={6} md={4} key={address.clientId || address.id}>
+                <Card 
+                  variant="outlined"
+                  sx={{
+                    position: 'relative',
+                    borderColor: (selectedAddressId === (address.clientId || address.id)) ? PRIMARY_COLOR : 'rgba(0, 0, 0, 0.12)',
+                    borderWidth: (selectedAddressId === (address.clientId || address.id)) ? 2 : 1,
+                    borderRadius: 2,
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      borderColor: (selectedAddressId === (address.clientId || address.id)) ? PRIMARY_COLOR : SECONDARY_COLOR,
+                    }
+                  }}
+                  onClick={() => handleAddressSelection(address.clientId || address.id)}
+                >
+                  {(selectedAddressId === (address.clientId || address.id)) && (
+                    <Badge
+                      sx={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        '& .MuiBadge-badge': {
+                          bgcolor: PRIMARY_COLOR,
+                          color: '#fff'
+                        }
+                      }}
+                      badgeContent={<CheckCircleIcon fontSize="small" />}
+                    />
+                  )}
+                  <CardContent>
+                    <FormControlLabel
+                      value={address.clientId || address.id}
+                      control={
+                        <Radio 
+                          sx={{ 
+                            '&.Mui-checked': { color: PRIMARY_COLOR },
+                            position: 'absolute',
+                            top: 10,
+                            left: 10
+                          }} 
+                        />
+                      }
+                      label=""
+                      sx={{ m: 0 }}
+                    />
+                    
+                    <Box sx={{ pl: 4, pt: 1 }}>
+                      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                        {address.name}
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+                        <LocationOnIcon fontSize="small" sx={{ color: 'text.secondary', mr: 1, mt: 0.3 }} />
+                        <Typography variant="body2" color="text.secondary">
+                          {address.streetAddress}{address.area ? `, ${address.area}` : ''}{address.zone ? `, ${address.zone}` : ''}{address.city ? `, ${address.city}` : ''}
+                        </Typography>
+                      </Box>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <PhoneIcon fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />
+                        <Typography variant="body2" color="text.secondary">
+                          {address.phoneNumber || address.mobile}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+            
+            {/* Add New Address Card */}
+            <Grid item xs={12} sm={6} md={4}>
+              <Card 
+                variant="outlined"
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  p: 2,
+                  borderStyle: 'dashed',
+                  borderColor: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    borderColor: PRIMARY_COLOR,
+                    backgroundColor: LIGHT_COLOR
+                  }
+                }}
+                onClick={handleAddNewAddress}
+              >
+                <AddCircleOutlineIcon sx={{ fontSize: 40, color: PRIMARY_COLOR, mb: 1 }} />
+                <Typography variant="body1" fontWeight={500} align="center">
+                  Add New Address
+                </Typography>
+              </Card>
+            </Grid>
+          </Grid>
+        </RadioGroup>
+        
+        {!showNewAddressForm && (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              disabled={!selectedAddressId || loading}
+              sx={{
+                bgcolor: PRIMARY_COLOR,
+                '&:hover': { bgcolor: SECONDARY_COLOR },
+                borderRadius: 5,
+                px: 4,
+                py: 1.5,
+                fontWeight: 600
+              }}
+            >
+              {loading ? (
+                <CircularProgress size={24} sx={{ color: 'white' }} />
+              ) : (
+                'Deliver to This Address'
+              )}
+            </Button>
+          </Box>
+        )}
+      </Box>
+    );
   };
 
   return (
-    <Grid container spacing={4}>
-      <Grid item xs={12} lg={5}>
-        <Paper elevation={0} className="border h-[30.5rem] overflow-y-scroll" sx={{
-          borderColor: '#000000',
-          bgcolor: '#ffffff',
-          borderRadius: 2
-        }}>
-          <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: '#000000', fontWeight: 600, color: '#000000' }}>
-            Saved Addresses
-          </Typography>
-          {auth.user?.addresses.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => setSelectedAdress(item)}
-              className="p-5 py-7 border-b cursor-pointer transition-all duration-200 hover:bg-gray-50"
-              style={{ borderColor: '#000000' }}
-            >
-              <AddressCard address={item} />
-              {selectedAddress?.id === item.id && (
-                <Button
-                  sx={{ 
-                    mt: 2,
-                    bgcolor: '#000000',
-                    color: '#ffffff',
-                    '&:hover': {
-                      bgcolor: '#333333',
-                    },
-                    textTransform: 'none',
-                    borderRadius: 2
-                  }}
-                  size="large"
-                  variant="contained"
-                  onClick={() => handleSelectAddress(item)}
-                >
-                  Deliver to this address
-                </Button>
-              )}
-            </div>
-          ))}
-        </Paper>
-      </Grid>
-      <Grid item xs={12} lg={7}>
-        <Paper elevation={0} className="border p-5" sx={{
-          borderColor: '#000000',
-          bgcolor: '#ffffff',
-          borderRadius: 2
-        }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#000000' }}>
-              Add New Delivery Address
-            </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={manualInput}
-                  onChange={toggleManualInput}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#000000',
-                      '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#000000',
-                    },
-                  }}
-                />
-              }
-              label={<Typography variant="body2" color="#000000">Manual Input</Typography>}
-            />
-          </Box>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  id="firstName"
-                  name="firstName"
-                  label="First Name"
-                  fullWidth
-                  autoComplete="given-name"
-                  sx={commonTextFieldStyles}
-                  InputLabelProps={{
-                    style: { color: '#000000' }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  id="lastName"
-                  name="lastName"
-                  label="Last Name"
-                  fullWidth
-                  autoComplete="given-name"
-                  sx={commonTextFieldStyles}
-                  InputLabelProps={{
-                    style: { color: '#000000' }
-                  }}
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Divider sx={{ my: 1, bgcolor: '#000000' }}>
-                  <Typography variant="body2" color="#000000">
-                    Address Details
-                  </Typography>
-                </Divider>
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  required
-                  id="address"
-                  name="address"
-                  label="Street Address"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  placeholder="House/Building number, Street name, Area"
-                  sx={commonTextFieldStyles}
-                  InputProps={{
-                    startAdornment: <HomeIcon sx={{ mr: 1, color: '#000000' }} />,
-                  }}
-                  InputLabelProps={{
-                    style: { color: '#000000' }
-                  }}
-                />
-              </Grid>
-
-              {!manualInput ? (
-                <>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      select
-                      required
-                      id="division"
-                      name="division"
-                      label="Division"
-                      fullWidth
-                      value={selectedDivision}
-                      onChange={(e) => setSelectedDivision(e.target.value)}
-                      sx={commonTextFieldStyles}
-                      InputProps={{
-                        startAdornment: <LocationOnIcon sx={{ mr: 1, color: '#000000' }} />,
-                      }}
-                      InputLabelProps={{
-                        style: { color: '#000000' }
-                      }}
-                      disabled={loading}
-                      SelectProps={{
-                        MenuProps: {
-                          PaperProps: {
-                            sx: {
-                              '& .MuiMenuItem-root': {
-                                color: '#000000'
-                              }
-                            }
-                          }
-                        }
-                      }}
-                    >
-                      {divisions.map((division) => (
-                        <MenuItem key={division.division} value={division.division}>
-                          {division.division} ({division.divisionbn})
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      select
-                      required
-                      id="district"
-                      name="district"
-                      label="District"
-                      fullWidth
-                      value={selectedDistrict}
-                      onChange={(e) => setSelectedDistrict(e.target.value)}
-                      disabled={!selectedDivision || loading}
-                      sx={commonTextFieldStyles}
-                      InputLabelProps={{
-                        style: { color: '#000000' }
-                      }}
-                      SelectProps={{
-                        MenuProps: {
-                          PaperProps: {
-                            sx: {
-                              '& .MuiMenuItem-root': {
-                                color: '#000000'
-                              }
-                            }
-                          }
-                        }
-                      }}
-                    >
-                      {districts.map((district) => (
-                        <MenuItem key={district.district} value={district.district}>
-                          {district.district}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      select
-                      required
-                      id="upazilla"
-                      name="upazilla"
-                      label="Upazilla"
-                      fullWidth
-                      value={selectedUpazilla}
-                      onChange={(e) => setSelectedUpazilla(e.target.value)}
-                      disabled={!selectedDistrict || loading}
-                      sx={commonTextFieldStyles}
-                      InputLabelProps={{
-                        style: { color: '#000000' }
-                      }}
-                      SelectProps={{
-                        MenuProps: {
-                          PaperProps: {
-                            sx: {
-                              '& .MuiMenuItem-root': {
-                                color: '#000000'
-                              }
-                            }
-                          }
-                        }
-                      }}
-                    >
-                      {upazillas.map((upazilla) => (
-                        <MenuItem key={upazilla} value={upazilla}>
-                          {upazilla}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                </>
-              ) : (
-                <>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      required
-                      id="manualDivision"
-                      name="manualDivision"
-                      label="Division"
-                      fullWidth
-                      sx={commonTextFieldStyles}
-                      InputProps={{
-                        startAdornment: <LocationOnIcon sx={{ mr: 1, color: '#000000' }} />,
-                      }}
-                      InputLabelProps={{
-                        style: { color: '#000000' }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      required
-                      id="manualDistrict"
-                      name="manualDistrict"
-                      label="District"
-                      fullWidth
-                      sx={commonTextFieldStyles}
-                      InputLabelProps={{
-                        style: { color: '#000000' }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      required
-                      id="manualUpazilla"
-                      name="manualUpazilla"
-                      label="Upazilla"
-                      fullWidth
-                      sx={commonTextFieldStyles}
-                      InputLabelProps={{
-                        style: { color: '#000000' }
-                      }}
-                    />
-                  </Grid>
-                </>
-              )}
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  id="zip"
-                  name="zip"
-                  label="Postal Code"
-                  fullWidth
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  sx={commonTextFieldStyles}
-                  InputLabelProps={{
-                    style: { color: '#000000' }
-                  }}
-                  helperText={!manualInput && postalCode ? "Auto-filled based on your district" : ""}
-                  FormHelperTextProps={{
-                    style: { color: '#000000' }
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  required
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  label="Phone Number"
-                  fullWidth
-                  autoComplete="tel"
-                  sx={commonTextFieldStyles}
-                  placeholder="e.g., +880 1XXX-XXXXXX"
-                  InputProps={{
-                    startAdornment: <PhoneIcon sx={{ mr: 1, color: '#000000' }} />,
-                  }}
-                  InputLabelProps={{
-                    style: { color: '#000000' }
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                {loading ? (
-                  <CircularProgress sx={{ color: '#000000' }} />
-                ) : (
-                  <Button
-                    sx={{
-                      padding: ".9rem 1.5rem",
-                      bgcolor: '#000000',
-                      color: '#ffffff',
-                      '&:hover': {
-                        bgcolor: '#333333',
-                      },
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      fontSize: '1rem'
-                    }}
-                    size="large"
-                    type="submit"
-                    variant="contained"
-                    fullWidth
-                  >
-                    Save & Deliver to this address
-                  </Button>
-                )}
-              </Grid>
-            </Grid>
-          </form>
-        </Paper>
-      </Grid>
-
-      <Snackbar 
-        open={!!error} 
-        autoHideDuration={6000} 
-        onClose={() => setError("")}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={() => setError("")} 
-          severity={apiError ? "warning" : "error"} 
-          sx={{ 
-            width: '100%',
-            bgcolor: '#f5f5f5',
-            color: '#000000',
-            border: '1px solid #000000',
-            '& .MuiAlert-icon': {
-              color: '#000000'
-            }
-          }}
-        >
+    <Box>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
+      )}
+      
+      {/* Saved Addresses Section */}
+      {savedAddresses.length > 0 && (
+        <>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: PRIMARY_COLOR }}>
+            Saved Addresses
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          
+          {renderSavedAddresses()}
+          
+          {showNewAddressForm && (
+            <Box sx={{ mt: 4 }}>
+              <Divider sx={{ mb: 3 }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: PRIMARY_COLOR }}>
+                Add New Address
+              </Typography>
+            </Box>
+          )}
+        </>
+      )}
+
+      {/* New Address Form */}
+      {showNewAddressForm && (
+        <Box 
+          component="form" 
+          onSubmit={handleSubmit}
+          sx={{
+            mt: savedAddresses.length === 0 ? 0 : 3,
+            p: { xs: 2, md: 3 },
+            borderRadius: 2,
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            bgcolor: '#FFFFFF'
+          }}
+        >
+          {/* Guest checkout option */}
+          {!auth?.user && (
+            <Box sx={{ mb: 3 }}>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                You are not logged in. You can continue as a guest or create an account.
+              </Alert>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={isGuest}
+                    onChange={(e) => setIsGuest(e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: PRIMARY_COLOR,
+                        '&:hover': {
+                          backgroundColor: 'rgba(0, 80, 58, 0.08)',
+                        },
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: PRIMARY_COLOR,
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    Continue as Guest
+                  </Typography>
+                }
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {isGuest 
+                  ? "You can check out without creating an account. Your order can be tracked using your phone number." 
+                  : "Create an account to track your orders and save your addresses for future purchases."}
+              </Typography>
+              {!isGuest && (
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/register')}
+                  sx={{
+                    mt: 2,
+                    color: PRIMARY_COLOR,
+                    borderColor: PRIMARY_COLOR,
+                    '&:hover': {
+                      borderColor: SECONDARY_COLOR,
+                      backgroundColor: 'rgba(0, 80, 58, 0.04)'
+                    }
+                  }}
+                >
+                  Create Account
+                </Button>
+              )}
+            </Box>
+          )}
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={12}>
+              <TextField
+                id="name"
+                name="name"
+                label="Name"
+                fullWidth
+                value={formValues.name}
+                onChange={handleInputChange}
+                sx={commonTextFieldStyles}
+              />
+            </Grid>
+            <Grid item xs={12} sm={8}>
+              <TextField
+                id="phoneNumber"
+                name="phoneNumber"
+                label="Phone Number"
+                fullWidth
+                value={formValues.phoneNumber}
+                onChange={handleInputChange}
+                sx={commonTextFieldStyles}
+                InputProps={{
+                  startAdornment: <PhoneIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                }}
+              />
+            </Grid>
+            {/* City Selection */}
+            <Grid item xs={12} sm={4}>
+              <FormControl fullWidth>
+                <InputLabel sx={{ color: PRIMARY_COLOR }}>City</InputLabel>
+                <Select
+                  value={selectedCity}
+                  name="city"
+                  label="City"
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  disabled={loading}
+                  sx={{
+                    color: PRIMARY_COLOR,
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(0, 0, 0, 0.23)',
+                      '&:focus': {
+                        borderColor: SECONDARY_COLOR,
+                      }
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: SECONDARY_COLOR,
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: SECONDARY_COLOR,
+                    }
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>Select City</em>
+                  </MenuItem>
+                  {cities.map((city) => (
+                    <MenuItem key={city.city_id} value={city.city_id}>
+                      {city.city_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            {/* Email field for guest checkout */}
+            {!auth?.user && isGuest && (
+              <Grid item xs={12}>
+                <TextField
+                  id="email"
+                  name="email"
+                  label="Email (optional)"
+                  fullWidth
+                  type="email"
+                  helperText="Provide an email to receive order confirmation"
+                  sx={commonTextFieldStyles}
+                />
+              </Grid>
+            )}
+            <Grid item xs={12}>
+              <TextField
+                id="address"
+                name="address"
+                label="Street Address"
+                fullWidth
+                multiline
+                rows={2}
+                value={formValues.address}
+                onChange={handleInputChange}
+                sx={commonTextFieldStyles}
+                InputProps={{
+                  startAdornment: <LocationOnIcon sx={{ mr: 1, mt: 1.5, color: 'text.secondary' }} />
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={saveAddress}
+                    onChange={(e) => setSaveAddress(e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: PRIMARY_COLOR,
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: PRIMARY_COLOR,
+                      },
+                    }}
+                  />
+                }
+                label="Save this address for future use"
+              />
+            </Grid>
+
+            <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              {savedAddresses.length > 0 && (
+                <Button
+                  variant="outlined"
+                  onClick={() => setShowNewAddressForm(false)}
+                  sx={{
+                    mr: 2,
+                    color: PRIMARY_COLOR,
+                    borderColor: PRIMARY_COLOR,
+                    '&:hover': { borderColor: PRIMARY_COLOR, bgcolor: LIGHT_COLOR },
+                    borderRadius: 5,
+                    px: 3,
+                    py: 1.5
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={loading}
+                sx={{
+                  bgcolor: PRIMARY_COLOR,
+                  '&:hover': { bgcolor: SECONDARY_COLOR},
+                  borderRadius: 5,
+                  px: 4,
+                  py: 1.5,
+                  fontWeight: 600
+                }}
+              >
+                {loading ? (
+                  <CircularProgress size={24} sx={{ color: 'white' }} />
+                ) : (
+                  'Save & Continue'
+                )}
+              </Button>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
       </Snackbar>
-    </Grid>
+    </Box>
   );
 }

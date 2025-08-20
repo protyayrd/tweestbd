@@ -325,7 +325,8 @@ const ProductDetails = () => {
                       <TableRow>
                         <TableCell>Size</TableCell>
                         <TableCell align="right">Chest (inches)</TableCell>
-                        <TableCell align="right">Body Length (inches)</TableCell>
+                        <TableCell align="right">Length (inches)</TableCell>
+                        <TableCell align="right">Shoulder (inches)</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -333,7 +334,8 @@ const ProductDetails = () => {
                         <TableRow key={size}>
                           <TableCell>{size}</TableCell>
                           <TableCell align="right">{measurements.chest || 'N/A'}</TableCell>
-                          <TableCell align="right">{measurements.bodyLength || 'N/A'}</TableCell>
+                          <TableCell align="right">{measurements.length || 'N/A'}</TableCell>
+                          <TableCell align="right">{measurements.shoulder || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

@@ -42,7 +42,6 @@ const categoryReducer = (state = initialState, action) => {
       };
 
     case GET_CATEGORIES_SUCCESS:
-      console.log('GET_CATEGORIES_SUCCESS payload:', action.payload);
       return {
         ...state,
         loading: false,

@@ -9,12 +9,17 @@ const paymentSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'users',
-        required: true
+        required: false
     },
     paymentMethod: {
         type: String,
         required: true,
-        enum: ['SSLCommerz']
+        enum: ['SSLCommerz', 'bKash', 'COD', 'Outlet']
+    },
+    paymentOption: {
+        type: String,
+        required: false,
+        enum: ['sslcommerz', 'bkash', 'cod', 'outlet', 'online']
     },
     transactionId: {
         type: String,
@@ -24,6 +29,15 @@ const paymentSchema = new mongoose.Schema({
     amount: {
         type: Number,
         required: true
+    },
+    dueAmount: {
+        type: Number,
+        default: 0
+    },
+    dueStatus: {
+        type: String,
+        enum: ['NONE', 'PENDING', 'PAID'],
+        default: 'NONE'
     },
     paymentPhoneNumber: {
         type: String,
@@ -36,6 +50,9 @@ const paymentSchema = new mongoose.Schema({
         enum: ['PENDING', 'COMPLETED', 'VERIFIED', 'FAILED', 'CANCELLED']
     },
     paymentDetails: {
+        type: Object
+    },
+    sslDetails: {
         type: Object
     },
     validationId: {

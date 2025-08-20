@@ -54,6 +54,23 @@ const getCategoryById = async (req, res) => {
   }
 };
 
+// Get category by slug
+const getCategoryBySlug = async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    const category = await Category.findOne({ slug }).populate('parentCategory', 'name');
+    
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+    
+    res.status(200).json(category);
+  } catch (error) {
+    console.error('Get category by slug error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Update category
 const updateCategory = async (req, res) => {
   try {
@@ -169,6 +186,7 @@ module.exports = {
   createCategory,
   getAllCategories,
   getCategoryById,
+  getCategoryBySlug,
   updateCategory,
   deleteCategory,
   getFeaturedCategories

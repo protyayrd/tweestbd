@@ -34,7 +34,6 @@ const FeaturedCategories = () => {
 
   const getAuthConfig = () => {
     const token = localStorage.getItem('jwt');
-    console.log('Using auth token:', token);
     return {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -76,7 +75,6 @@ const FeaturedCategories = () => {
         }
       });
 
-      console.log('Server response:', response.data);
 
       // Refresh categories after update
       dispatch(getCategories());
@@ -88,7 +86,7 @@ const FeaturedCategories = () => {
       });
     } catch (error) {
       console.error('Error updating category:', error);
-      console.log('Error details:', {
+      console.error('Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,

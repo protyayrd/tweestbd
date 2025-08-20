@@ -7,6 +7,10 @@ const bulkOrderSchema = new Schema({
     ref: 'users',
     required: true,
   },
+  formattedOrderId: {
+    type: String,
+    unique: true
+  },
   orderItems: [{
     product: {
       type: mongoose.Schema.Types.ObjectId,

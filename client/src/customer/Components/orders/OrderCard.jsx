@@ -1,231 +1,160 @@
-import { Box, Grid, Typography, Chip, Badge, CircularProgress, Divider } from "@mui/material";
+import {
+  Box,
+  Grid,
+  Typography,
+  Chip,
+  CircularProgress,
+  Button,
+  useMediaQuery
+} from "@mui/material";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import AdjustIcon from "@mui/icons-material/Adjust";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import StarIcon from "@mui/icons-material/Star";
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
-import { API_BASE_URL } from "../../../config/api";
+import { API_BASE_URL } from '../../../config/api';
+import { useTheme } from "@mui/material/styles";
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 const OrderCard = ({ item, order }) => {
   const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
   const [loading, setLoading] = useState(true);
-  
-  // Debug logs to see what data we're working with
-  console.log("Order Item:", JSON.stringify(item, null, 2));
-  console.log("Order:", JSON.stringify(order, null, 2));
-  
-  // Get product details
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const product = item?.product || {};
   const selectedColor = item?.color || '';
-  
-  // More robust approach to image URL construction
-  let imageUrl = '';
-  
-  // Function to properly format image URL
+
   const formatImageUrl = (url) => {
     if (!url) return '';
-    
-    // If it's already an absolute URL, return it as is
     if (url.startsWith('http')) return url;
-    
-    // Remove any leading slashes
     const cleanUrl = url.startsWith('/') ? url.slice(1) : url;
-    
-    // Construct the full URL
     return `${API_BASE_URL}/${cleanUrl}`;
   };
-  
-  // Try to get the image URL from the product's color-specific images first
+
+  let imageUrl = '';
+
   if (selectedColor && product?.colors && Array.isArray(product.colors)) {
-    const colorObj = product.colors.find(c => 
-      c && c.name && c.name.toLowerCase() === selectedColor.toLowerCase()
+    const colorObj = product.colors.find(c =>
+      c?.name?.toLowerCase() === selectedColor.toLowerCase()
     );
-    
-    if (colorObj && colorObj.images && colorObj.images.length > 0) {
+    if (colorObj?.images?.length > 0) {
       imageUrl = formatImageUrl(colorObj.images[0]);
-      console.log("Using color-specific image:", imageUrl);
     }
   }
-  
-  // If no color-specific image, try the product's main image
+
   if (!imageUrl && product?.imageUrl) {
     imageUrl = formatImageUrl(product.imageUrl);
-    console.log("Using product's main image:", imageUrl);
   }
-  
-  // If still no image, try the product's images array
-  if (!imageUrl && product?.images && Array.isArray(product.images) && product.images.length > 0) {
+
+  if (!imageUrl && Array.isArray(product?.images) && product.images.length > 0) {
     imageUrl = formatImageUrl(product.images[0]);
-    console.log("Using product's images array:", imageUrl);
   }
-  
-  // If the product has a thumbnail, use that as a last resort
+
   if (!imageUrl && product?.thumbnail) {
     imageUrl = formatImageUrl(product.thumbnail);
-    console.log("Using product's thumbnail:", imageUrl);
   }
-  
-  // Absolute URL for fallback image
+
   const fallbackImage = 'https://via.placeholder.com/80x80?text=No+Image';
-  
-  console.log("Final Image URL:", imageUrl);
-  
-  // Calculate prices and discounts
+
   const originalPrice = item?.price || 0;
   const discountedPrice = item?.discountedPrice || originalPrice;
   const quantity = item?.quantity || 1;
   const totalOriginalPrice = originalPrice * quantity;
   const totalDiscountedPrice = discountedPrice * quantity;
-  
-  // Check for promo code discount
+
   const promoDiscount = order?.promoCodeDiscount || 0;
   const promoCode = order?.promoDetails?.code || '';
   const hasPromoCode = promoCode || promoDiscount > 0;
-  
-  // Calculate final price after promo discount
+
   const finalPrice = Math.max(0, totalDiscountedPrice - promoDiscount);
-  
-  // Calculate discount percentage
-  const discountPercentage = originalPrice > 0 
-    ? Math.round(((originalPrice - discountedPrice) / originalPrice) * 100) 
+
+  const discountPercentage = originalPrice > 0
+    ? Math.round(((originalPrice - discountedPrice) / originalPrice) * 100)
     : 0;
-  
-  // Handle image load
+
   const handleImageLoad = () => {
     setLoading(false);
   };
-  
-  // Enhanced color rendering with direct HTML for better visibility
+
   const renderColorSwatch = (colorName) => {
     if (!colorName) return null;
-    
-    // Map of common color names to hex values
     const colorMap = {
-      'black': '#000000',
-      'white': '#FFFFFF',
-      'red': '#FF0000',
-      'blue': '#0000FF',
-      'green': '#008000',
-      'yellow': '#FFFF00',
-      'purple': '#800080',
-      'orange': '#FFA500',
-      'pink': '#FFC0CB',
-      'gray': '#808080',
-      'brown': '#A52A2A',
-      'navy': '#000080',
-      'teal': '#008080',
-      'maroon': '#800000',
-      'olive': '#808000',
-      'silver': '#C0C0C0',
-      'gold': '#FFD700',
-      'beige': '#F5F5DC',
-      'ivory': '#FFFFF0',
-      'khaki': '#F0E68C',
-      'lavender': '#E6E6FA',
-      'cyan': '#00FFFF',
-      'magenta': '#FF00FF',
-      'indigo': '#4B0082',
-      'violet': '#EE82EE',
-      'turquoise': '#40E0D0',
-      'coral': '#FF7F50',
-      'crimson': '#DC143C',
-      'aqua': '#00FFFF',
-      'lime': '#00FF00',
-      'fuchsia': '#FF00FF',
+      black: '#000', white: '#fff', red: '#f00', blue: '#00f', green: '#080',
+      yellow: '#ff0', purple: '#800080', orange: '#ffa500', pink: '#ffc0cb',
+      gray: '#808080', brown: '#a52a2a', navy: '#000080', teal: '#008080',
+      maroon: '#800000', olive: '#808000', silver: '#c0c0c0', gold: '#ffd700'
     };
-    
-    const colorKey = colorName.toLowerCase();
-    const backgroundColor = colorMap[colorKey] || colorName;
-    
-    // Special handling for white color
-    const isWhite = colorKey === 'white' || backgroundColor === '#FFFFFF' || backgroundColor === '#fff';
-    
-    // Create a direct HTML element for the color swatch
+    const backgroundColor = colorMap[colorName.toLowerCase()] || colorName;
+    const isWhite = backgroundColor.toLowerCase() === '#fff' || backgroundColor.toLowerCase() === 'white';
+
     return (
-      <div 
-        style={{
-          backgroundColor: backgroundColor,
-          width: '24px',
-          height: '24px',
+      <Box
+        sx={{
+          backgroundColor,
+          width: 16,
+          height: 16,
           borderRadius: '50%',
-          display: 'inline-block',
-          marginRight: '8px',
-          border: isWhite ? '2px solid #aaa' : 'none',
-          boxShadow: '0 0 5px rgba(0,0,0,0.6)',
-          verticalAlign: 'middle'
+          marginRight: 1,
+          border: isWhite ? '1px solid #ccc' : 'none',
         }}
       />
     );
   };
-  
-  // Use useEffect to log when component mounts or updates with more detailed information
-  useEffect(() => {
-    console.log("OrderCard rendered with item:", JSON.stringify(item, null, 2));
-    console.log("Selected color:", selectedColor);
-    console.log("Image URL:", imageUrl);
-    
-    // Log product structure to help debug
-    if (product) {
-      console.log("Product structure:", {
-        hasImageUrl: !!product.imageUrl,
-        hasImages: !!(product.images && product.images.length > 0),
-        hasColors: !!(product.colors && product.colors.length > 0),
-        hasThumbnail: !!product.thumbnail
-      });
+
+  const getStatusColor = () => {
+    switch (order?.orderStatus) {
+      case 'CONFIRMED': return '#00503a';
+      case 'PLACED': return '#00503a';
+      case 'SHIPPED': return '#00503a';
+      case 'DELIVERED': return '#4CAF50';
+      case 'CANCELLED': return '#F44336';
+      default: return '#757575';
     }
-    
-    // Check if the selected color exists in product colors
-    if (selectedColor && product?.colors) {
-      const colorExists = product.colors.some(c => 
-        c && c.name && c.name.toLowerCase() === selectedColor.toLowerCase()
-      );
-      console.log(`Selected color "${selectedColor}" exists in product colors: ${colorExists}`);
-    }
-  }, [item, selectedColor, imageUrl, product]);
+  };
   
+  const getStatusBgColor = () => {
+    switch (order?.orderStatus) {
+      case 'CONFIRMED': return '#00503a15';
+      case 'PLACED': return '#00503a15';
+      case 'SHIPPED': return '#00503a15';
+      case 'DELIVERED': return '#4CAF5015';
+      case 'CANCELLED': return '#F4433615';
+      default: return '#75757515';
+    }
+  };
+
   return (
-    <Box className="p-5 shadow-lg hover:shadow-2xl border" sx={{ 
-      backgroundColor: '#ffffff', 
-      borderRadius: '8px',
-      transition: 'all 0.3s ease',
-      '&:hover': {
-        transform: 'translateY(-2px)',
-        boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
-      }
-    }}>
-      <Grid spacing={2} container sx={{ justifyContent: "space-between" }}>
-        <Grid item xs={6}>
-          <div
-            onClick={() => navigate(`/account/order/${order?._id}`)}
-            className="flex cursor-pointer"
-          >
-            {/* Image with loading state and fallback */}
+    <Box sx={{ width: '100%' }}>
+      <Grid container spacing={2} alignItems="center">
+        <Grid item xs={12} sm={6} md={5}>
+          <Box sx={{ display: 'flex' }}>
             <Box
+              onClick={() => navigate(product?.slug ? `/product/${product.slug}` : `/product/${product?._id}`)}
               sx={{
-                width: "5rem",
-                height: "5rem",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                overflow: "hidden",
-                borderRadius: "4px",
-                border: "1px solid #ddd",
-                backgroundColor: "#f9f9f9",
-                position: "relative"
+                width: 100,
+                height: 100,
+                overflow: 'hidden',
+                borderRadius: 2,
+                border: '1px solid #eee',
+                backgroundColor: '#f9f9fa',
+                position: 'relative',
+                cursor: 'pointer',
+                transition: 'transform 0.2s ease',
+                '&:hover': {
+                  transform: 'scale(1.05)'
+                }
               }}
             >
               {loading && !imgError && (
-                <CircularProgress size={24} sx={{ position: 'absolute', zIndex: 1 }} />
+                <CircularProgress size={20} sx={{ position: 'absolute', top: '40%', left: '40%', color: '#00503a' }} />
               )}
               <img
-                src={imgError ? fallbackImage : (imageUrl || fallbackImage)}
-                alt={product?.title || "Product image"}
+                src={imgError ? fallbackImage : imageUrl || fallbackImage}
+                alt={product?.title || 'Product'}
                 onLoad={handleImageLoad}
-                onError={(e) => {
-                  console.error("Image failed to load:", imageUrl);
-                  console.error("Image error event:", e);
+                onError={() => {
                   setImgError(true);
                   setLoading(false);
                 }}
@@ -233,166 +162,149 @@ const OrderCard = ({ item, order }) => {
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  objectPosition: 'center',
-                  opacity: loading ? 0.5 : 1,
-                  transition: 'opacity 0.3s ease'
+                  opacity: loading ? 0.5 : 1
                 }}
               />
             </Box>
-            
-            <div className="ml-5">
-              <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 0.5 }}>
-                {product?.title || 'Product'}
-              </Typography>
+            <Box sx={{ ml: 2 }}>
+              <Typography
+                variant="subtitle1"
+                sx={{ 
+                  cursor: 'pointer', 
+                  fontWeight: 500,
+                  '&:hover': { color: '#00503a' },
+                  transition: 'color 0.2s'
+                }}
+                                onClick={() => navigate(product?.slug ? `/product/${product.slug}` : `/product/${product?._id}`)}
+                >
+                  {product?.title || 'Product'}
+                </Typography>
               
-              <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                <span>Size: {item?.size || 'N/A'}</span>
-              </Typography>
+              {item?.size && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Size: {item.size}</Typography>
+              )}
               
               {selectedColor && (
-                <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                  {renderColorSwatch(selectedColor)}
-                  <span>Color: {selectedColor}</span>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: 'flex', alignItems: 'center' }}>
+                  {renderColorSwatch(selectedColor)} {selectedColor}
                 </Typography>
               )}
               
-              <Typography variant="body2" color="text.secondary">
-                <span>Quantity: {quantity}</span>
+              <Typography variant="body2" sx={{ mt: 0.5, display: 'flex', alignItems: 'center' }}>
+                <Box component="span" sx={{ color: 'text.secondary', mr: 1 }}>Qty:</Box> 
+                <Box component="span" sx={{ fontWeight: 500 }}>{quantity}</Box>
               </Typography>
-            </div>
-          </div>
+            </Box>
+          </Box>
         </Grid>
 
-        <Grid item xs={2}>
-          {/* Unit price */}
-          <Typography fontWeight="bold">
-            Tk. {discountedPrice}
-          </Typography>
-          
-          {originalPrice > discountedPrice && (
-            <Typography 
-              variant="body2" 
-              color="text.secondary" 
-              sx={{ textDecoration: 'line-through' }}
-            >
-              Tk. {originalPrice}
+        <Grid item xs={6} sm={3} md={3}>
+          <Box>
+            <Typography fontWeight={600} sx={{ color: '#00503a' }}>
+              Tk. {discountedPrice}
             </Typography>
-          )}
-          
-          {discountPercentage > 0 && (
-            <Typography variant="body2" sx={{ color: '#4CAF50', fontWeight: 'medium' }}>
-              Save {discountPercentage}%
-            </Typography>
-          )}
-          
-          <Divider sx={{ my: 1 }} />
-          
-          {/* Total price with quantity */}
-          <Typography variant="body2" fontWeight="medium">
-            Subtotal: Tk. {totalDiscountedPrice}
-          </Typography>
-          
-          {/* Promo code discount if available */}
-          {hasPromoCode && (
-            <Box sx={{ mt: 0.5 }}>
-              {promoCode && (
-                <Chip 
-                  icon={<LocalOfferIcon fontSize="small" />}
-                  label={promoCode}
-                  size="small"
-                  sx={{ 
-                    mb: 0.5, 
-                    fontSize: '0.7rem',
-                    backgroundColor: '#000',
-                    color: '#fff',
-                    '& .MuiChip-icon': {
-                      color: '#fff'
-                    }
-                  }}
-                />
-              )}
-              {promoDiscount > 0 && (
-                <Typography variant="body2" sx={{ color: '#4CAF50', fontWeight: 'medium', fontSize: '0.8rem' }}>
-                  Promo discount: -Tk. {promoDiscount}
+            
+            {originalPrice > discountedPrice && (
+              <Typography variant="body2" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
+                Tk. {originalPrice}
+              </Typography>
+            )}
+            
+            {discountPercentage > 0 && (
+              <Chip 
+                label={`${discountPercentage}% OFF`} 
+                size="small" 
+                sx={{ 
+                  backgroundColor: '#4CAF5015', 
+                  color: '#4CAF50',
+                  border: '1px solid #4CAF5030',
+                  fontWeight: 600,
+                  fontSize: '0.65rem',
+                  mt: 0.5
+                }} 
+              />
+            )}
+            
+            {hasPromoCode && (
+              <Box mt={1}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <LocalOfferIcon sx={{ fontSize: '0.9rem', color: '#00503a', mr: 0.5 }} />
+                  <Typography variant="caption" sx={{ color: '#00503a' }}>
+                    {promoCode ? `Promo: ${promoCode}` : 'Promo applied'}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: '#4CAF50', fontWeight: 500, mt: 0.5 }}>
+                  -Tk. {promoDiscount}
                 </Typography>
-              )}
-            </Box>
-          )}
-          
-          {/* Final price after promo discount */}
-          {promoDiscount > 0 && (
-            <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 0.5, borderTop: '1px dashed #ddd', pt: 0.5 }}>
-              Final: Tk. {finalPrice}
-            </Typography>
-          )}
-        </Grid>
-        
-        <Grid item xs={4}>
-          <Box sx={{ 
-            p: 1.5, 
-            backgroundColor: '#f5f5f5', 
-            borderRadius: '4px',
-            border: '1px solid #eee'
-          }}>
-            <Typography variant="subtitle2" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-              {order?.orderStatus === "DELIVERED" ? (
-               <>
-                 <FiberManualRecordIcon
-                    sx={{ width: "15px", height: "15px", color: "#4CAF50" }}
-                    className="p-0 mr-2 text-sm"
-                  />
-                  <span>Delivered On {new Date(order.deliveryDate || order.updatedAt || order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-               </>
-              ) : (
-                <>
-                  <AdjustIcon
-                    sx={{ 
-                      width: "15px", 
-                      height: "15px",
-                      color: order?.orderStatus === "CANCELLED" ? "#F44336" : "#4CAF50"
-                    }}
-                    className="p-0 mr-2 text-sm"
-                  />
-                  <span>
-                    {order?.orderStatus === "CONFIRMED" && "Order Confirmed"}
-                    {order?.orderStatus === "PLACED" && "Order Placed"}
-                    {order?.orderStatus === "SHIPPED" && "Order Shipped"}
-                    {order?.orderStatus === "CANCELLED" && "Order Cancelled"}
-                  </span>
-                </>
-              )}
-            </Typography>
-            
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {order?.orderStatus === "DELIVERED" && "Your Item Has Been Delivered"}
-              {order?.orderStatus === "CONFIRMED" && "Your Order Has Been Confirmed"}
-              {order?.orderStatus === "PLACED" && "Your Order Has Been Placed"}
-              {order?.orderStatus === "SHIPPED" && "Your Order Is On The Way"}
-              {order?.orderStatus === "CANCELLED" && "Your Order Has Been Cancelled"}
-            </Typography>
-            
-            {order?.orderStatus === "DELIVERED" && (
-              <Box
-                onClick={() => navigate(`/account/rate/${product?._id}`)}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  color: '#000',
-                  backgroundColor: '#f0f0f0',
-                  p: 1,
-                  borderRadius: '4px',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    backgroundColor: '#000',
-                    color: '#fff'
-                  }
-                }}
-              >
-                <StarIcon sx={{ fontSize: "1.5rem", mr: 1 }} />
-                <Typography variant="body2" fontWeight="medium">Rate & Review Product</Typography>
               </Box>
             )}
+            
+            {hasPromoCode && (
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#00503a', mt: 0.5 }}>
+                Total: Tk. {finalPrice}
+              </Typography>
+            )}
+          </Box>
+        </Grid>
+
+        <Grid item xs={6} sm={3} md={4}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: isMobile ? 'flex-end' : 'flex-start',
+            height: '100%',
+            justifyContent: 'space-between'
+          }}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                p: 1,
+                borderRadius: 1,
+                bgcolor: getStatusBgColor(),
+                mb: 1
+              }}
+            >
+              {order?.orderStatus === 'DELIVERED' ? (
+                <FiberManualRecordIcon sx={{ fontSize: 14, color: getStatusColor(), mr: 1 }} />
+              ) : (
+                <AdjustIcon sx={{ fontSize: 14, color: getStatusColor(), mr: 1 }} />
+              )}
+              <Typography variant="body2" sx={{ color: getStatusColor(), fontWeight: 600 }}>
+                {{
+                  'CONFIRMED': "Order Confirmed",
+                  'PLACED': "Order Placed",
+                  'SHIPPED': "Order Shipped",
+                  'DELIVERED': "Delivered",
+                  'CANCELLED': "Cancelled"
+                }[order?.orderStatus] || order?.orderStatus}
+              </Typography>
+            </Box>
+
+            <Typography variant="caption" color="text.secondary">
+              {{
+                'DELIVERED': `Delivered on ${new Date(order?.deliveryDate || order?.updatedAt || order?.createdAt).toLocaleDateString()}`,
+                'SHIPPED': "On the way",
+                'CANCELLED': "Order has been cancelled"
+              }[order?.orderStatus] || ""}
+            </Typography>
+
+            <Button 
+              size="small" 
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => navigate(product?.slug ? `/product/${product.slug}` : `/product/${product?._id}`)}
+              sx={{ 
+                mt: 2, 
+                color: '#00503a', 
+                textTransform: 'none',
+                borderColor: '#00503a',
+                '&:hover': {
+                  backgroundColor: '#00503a10',
+                }
+              }}
+            >
+              Track Order
+            </Button>
           </Box>
         </Grid>
       </Grid>

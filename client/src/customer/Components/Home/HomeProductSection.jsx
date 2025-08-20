@@ -3,16 +3,16 @@ import HomeProductCard from "./HomeProductCard";
 import "./HomeProductSection.css";
 import { Button } from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 const HomeProductSection = ({ section, data, categoryId }) => {
   const navigate = useNavigate();
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const slidePrev = () => setActiveIndex(activeIndex - 1);
-  const slideNext = () => setActiveIndex(activeIndex + 1);
-  const syncActiveIndex = ({ item }) => setActiveIndex(item);
+  const slidePrev = useCallback(() => setActiveIndex(prev => prev - 1), []);
+  const slideNext = useCallback(() => setActiveIndex(prev => prev + 1), []);
+  const syncActiveIndex = useCallback(({ item }) => setActiveIndex(item), []);
 
   const responsive = {
     0: {
@@ -39,12 +39,28 @@ const HomeProductSection = ({ section, data, categoryId }) => {
 
   const items = useMemo(() => {
     if (!data?.content) return [];
-    return data.content.map((item) => (
+
+    // Create a Set to track unique product IDs
+    const uniqueProductIds = new Set();
+    const uniqueProducts = [];
+
+    // Filter out duplicate products
+    data.content.forEach((item) => {
+      if (!uniqueProductIds.has(item._id)) {
+        uniqueProductIds.add(item._id);
+        uniqueProducts.push(item);
+      }
+    });
+
+    return uniqueProducts.map((item) => (
       <div key={item._id} className="px-2">
-        <HomeProductCard product={item} />
+        <HomeProductCard 
+          product={item} 
+          isNewArrival={section === "New Arrivals"}
+        />
       </div>
     ));
-  }, [data?.content]);
+  }, [data?.content, section]);
 
   const shouldShowNext = activeIndex < (items.length - responsive[1280].items);
   const shouldShowPrev = activeIndex > 0;
@@ -59,82 +75,45 @@ const HomeProductSection = ({ section, data, categoryId }) => {
         <h2 className="text-2xl font-extrabold text-gray-900">{section}</h2>
         <Button
           variant="text"
-          onClick={() => navigate(`/products?category=${categoryId}`)}
+          onClick={() => navigate(`/${categorySlug || categoryId}&page=1`)}
           className="text-primary-600 hover:text-primary-500"
         >
           View All
         </Button>
       </div>
-
-      <div className="relative border rounded-lg p-5">
+      
+      <div className="relative">
         <AliceCarousel
-          disableButtonsControls
-          disableDotsControls
-          mouseTracking
           items={items}
-          activeIndex={activeIndex}
           responsive={responsive}
+          disableDotsControls
+          disableButtonsControls
+          activeIndex={activeIndex}
           onSlideChanged={syncActiveIndex}
-          animationType="fadeout"
-          animationDuration={500}
+          animationType="slide"
+          animationDuration={800}
         />
-
-        {shouldShowNext && (
-          <Button
-            onClick={slideNext}
-            variant="contained"
-            className="z-50"
-            sx={{
-              position: "absolute",
-              top: "50%",
-              right: "0rem",
-              transform: "translate(50%, -50%)",
-              bgcolor: "white",
-              color: "primary.main",
-              "&:hover": {
-                bgcolor: "primary.main",
-                color: "white",
-              },
-              minWidth: "40px",
-              width: "40px",
-              height: "40px",
-              borderRadius: "50%",
-              boxShadow: 2,
-            }}
-          >
-            <ArrowForwardIosIcon />
-          </Button>
-        )}
-
+        
         {shouldShowPrev && (
-          <Button
+          <button
             onClick={slidePrev}
-            variant="contained"
-            className="z-50"
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "0rem",
-              transform: "translate(-50%, -50%) rotate(180deg)",
-              bgcolor: "white",
-              color: "primary.main",
-              "&:hover": {
-                bgcolor: "primary.main",
-                color: "white",
-              },
-              minWidth: "40px",
-              width: "40px",
-              height: "40px",
-              borderRadius: "50%",
-              boxShadow: 2,
-            }}
+            className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 bg-white bg-opacity-75 rounded-full p-2 shadow-lg hover:bg-opacity-100 transition-all"
+          >
+            <ArrowForwardIosIcon className="transform rotate-180" />
+          </button>
+        )}
+        
+        {shouldShowNext && (
+          <button
+            onClick={slideNext}
+            className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white bg-opacity-75 rounded-full p-2 shadow-lg hover:bg-opacity-100 transition-all"
           >
             <ArrowForwardIosIcon />
-          </Button>
+          </button>
         )}
       </div>
     </div>
   );
 };
 
-export default HomeProductSection;
+export default memo(HomeProductSection);

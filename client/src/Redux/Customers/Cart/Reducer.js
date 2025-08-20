@@ -16,7 +16,10 @@ import {
   APPLY_PROMO_CODE_FAILURE,
   REMOVE_PROMO_CODE_REQUEST,
   REMOVE_PROMO_CODE_SUCCESS,
-  REMOVE_PROMO_CODE_FAILURE
+  REMOVE_PROMO_CODE_FAILURE,
+  CLEAR_CART_REQUEST,
+  CLEAR_CART_SUCCESS,
+  CLEAR_CART_FAILURE
 } from "./ActionType";
 
 const initialState = {
@@ -40,6 +43,7 @@ const cartReducer = (state = initialState, action) => {
     case UPDATE_CART_ITEM_REQUEST:
     case APPLY_PROMO_CODE_REQUEST:
     case REMOVE_PROMO_CODE_REQUEST:
+    case CLEAR_CART_REQUEST:
       return {
         ...state,
         loading: true,
@@ -50,6 +54,7 @@ const cartReducer = (state = initialState, action) => {
     case ADD_ITEM_TO_CART_SUCCESS:
     case UPDATE_CART_ITEM_SUCCESS:
     case APPLY_PROMO_CODE_SUCCESS:
+    case CLEAR_CART_SUCCESS:
       return {
         ...state,
         loading: false,
@@ -94,6 +99,7 @@ const cartReducer = (state = initialState, action) => {
     case UPDATE_CART_ITEM_FAILURE:
     case APPLY_PROMO_CODE_FAILURE:
     case REMOVE_PROMO_CODE_FAILURE:
+    case CLEAR_CART_FAILURE:
       return {
         ...state,
         loading: false,

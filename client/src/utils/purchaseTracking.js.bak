@@ -1,0 +1,116 @@
+// purchaseTracking.js
+// Utility for tracking purchase events with Meta Pixel and other analytics services
+
+import * as analytics from './analytics';
+import * as fbq from './metaPixel';
+
+/**
+ * Track a completed purchase with enhanced e-commerce data
+ * @param {Object} orderData - The order data from the backend
+ * @param {string} transactionId - Optional transaction ID from payment provider
+ */
+export const trackPurchaseEvent = (orderData, transactionId = null) => {
+  if (!orderData) return;
+  
+  try {
+    // Calculate total price
+    const orderTotal = orderData.totalAmount || 
+                      orderData.totalPrice || 
+                      (orderData.items && orderData.items.reduce(
+                        (sum, item) => sum + ((item.discountedPrice || item.price) * item.quantity), 0
+                      )) ||
+                      0;
+
+    // Create order items array for detailed tracking
+    const orderItems = (orderData.items || []).map(item => ({
+      id: item.productId || item._id,
+      quantity: item.quantity || 1,
+      item_price: item.discountedPrice || item.price
+    }));
+
+    // Get list of product IDs
+    const productIds = (orderData.items || []).map(item => item.productId || item._id);
+
+    // Create analytics data object with enhanced e-commerce parameters
+    const purchaseData = {
+      content_type: 'product',
+      contents: orderItems,
+      content_ids: productIds,
+      num_items: orderData.totalItem || orderItems.length,
+      currency: 'BDT',
+      value: orderTotal,
+      transaction_id: orderData.formattedId || transactionId,
+      shipping_cost: orderData.shippingPrice || 0,
+      tax: 0, // If you have tax data, add it here
+      order_id: orderData._id,
+      user_id: orderData.userId,
+      coupon_code: orderData.promoCode || null
+    };
+
+    // Track the purchase event in browser pixel
+    analytics.trackPayment.complete(purchaseData);
+
+    // Also send server-side conversion API event for better tracking
+    fbq.sendApiConversion('Purchase', {
+      custom_data: purchaseData,
+      user_id: orderData.userId,
+      email: orderData.email || orderData.user?.email,
+      phone: orderData.contactNumber || orderData.user?.contactNumber
+    });
+
+    console.log('Purchase event tracked successfully');
+    return true;
+  } catch (error) {
+    console.error('Error tracking purchase event:', error);
+    return false;
+  }
+};
+
+/**
+ * Track an add-to-cart event with enhanced data
+ * @param {Object} product - The product being added to cart
+ * @param {string} color - Selected color
+ * @param {string} size - Selected size
+ * @param {number} quantity - Quantity being added
+ */
+export const trackAddToCartEvent = (product, color, size, quantity = 1) => {
+  if (!product) return;
+  
+  try {
+    const itemPrice = product.discountedPrice || product.price;
+    const analyticsData = {
+      content_type: 'product',
+      content_name: product.title,
+      content_category: product.category,
+      content_ids: [product._id],
+      contents: [{
+        id: product._id,
+        quantity: quantity,
+        item_price: itemPrice
+      }],
+      currency: 'BDT',
+      value: itemPrice * quantity,
+      color: color,
+      size: size
+    };
+    
+    // Track in browser pixel
+    analytics.trackProduct.addToCart(analyticsData);
+    
+    // Also send server-side conversion API event
+    fbq.sendApiConversion('AddToCart', {
+      custom_data: analyticsData,
+      user_id: localStorage.getItem('user_id') // If you store user ID in localStorage
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error tracking add to cart event:', error);
+    return false;
+  }
+};
+
+export default {
+  trackPurchaseEvent,
+  trackAddToCartEvent
+};

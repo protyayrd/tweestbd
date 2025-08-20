@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 const Category = require('../models/category.model');
+require('dotenv').config();
+
+const MONGODB_URL = process.env.MONGODB_URL || 'mongodb://localhost:27017/tweestbd';
 
 const migrateFeaturedInCarousel = async () => {
   try {
@@ -29,7 +32,7 @@ const migrateFeaturedInCarousel = async () => {
 };
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/your_database')
+mongoose.connect(MONGODB_URL)
   .then(() => {
     console.log('Connected to MongoDB');
     migrateFeaturedInCarousel();

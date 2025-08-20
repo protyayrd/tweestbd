@@ -1,17 +1,21 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback, lazy, Suspense } from "react";
+import axios from 'axios';
 import { useDispatch, useSelector } from "react-redux";
 import { getCategories } from "../Redux/Admin/Category/Action";
 import { findProducts } from "../Redux/Customers/Product/Action";
 import { Box, Container, IconButton, Typography, Grid, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from '../config/api';
 import HomeCarousel from "../customer/Components/Carousel/HomeCarousel";
 import HomeProductCard from "../customer/Components/Home/HomeProductCard";
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { styled } from '@mui/material/styles';
-import { Splide, SplideSlide } from '@splidejs/react-splide';
-import '@splidejs/react-splide/css';
-import { motion } from 'framer-motion';
+// Import Swiper React components
+// Moved Swiper into a lazy-loaded child to reduce initial bundle
+// Import IntersectionObserver hook for better performance
+import { useInView } from 'react-intersection-observer';
+const NewArrivalsCarousel = lazy(() => import('../customer/Components/Home/NewArrivalsCarousel'));
 
 const ScrollButton = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
@@ -54,11 +58,11 @@ const ProductWrapper = styled(Box)(({ theme }) => ({
   padding: 0,
   '& .product-image': {
     width: '100%',
-    paddingTop: '180%',
+    paddingTop: '150%',
     position: 'relative',
     overflow: 'hidden',
     margin: 0,
-    border: '4px solid #000',
+    border: '1px solid #e0e0e0',
     boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
     background: '#fff',
     '& img': {
@@ -116,7 +120,7 @@ const ProductWrapper = styled(Box)(({ theme }) => ({
   },
   [theme.breakpoints.down('sm')]: {
     '& .product-image': {
-      paddingTop: '200%',
+      paddingTop: '180%',
     }
   }
 }));
@@ -168,7 +172,7 @@ const CategoryInfo = styled(Box)(({ theme }) => ({
   }
 }));
 
-const CategoryCard = styled(motion.div)(({ theme }) => ({
+const CategoryCard = styled(Box)(({ theme }) => ({
   width: '100%',
   height: '100%',
   borderRadius: theme.spacing(1),
@@ -180,49 +184,152 @@ const CategoryCard = styled(motion.div)(({ theme }) => ({
 }));
 
 const Homepage = () => {
+  // Swiper usage moved to NewArrivalsCarousel
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [newArrivals, setNewArrivals] = useState([]);
+  const [newArrivalsByCategory, setNewArrivalsByCategory] = useState({});
+  
+  // Use IntersectionObserver for the New Arrivalss section
+  const { ref: newArrivalsRef, inView: newArrivalsInView } = useInView({
+    threshold: 0.2, // 20% visibility triggers the callback
+    triggerOnce: false
+  });
+  
+  // No external swiper ref needed; each carousel manages its own autoplay based on inView
   
   const categoryState = useSelector((state) => state.category);
-  const { categories, loading, error } = categoryState;
+  const { categories = [], loading = false, error = null } = categoryState || {};
   const customersProduct = useSelector((state) => state.customersProduct);
 
-  // Get level 1 and 2 categories
+  // Get level 1, 2 and 3 categories
   const level1Categories = categories?.filter(cat => cat.level === 1) || [];
   const level2Categories = categories?.filter(cat => cat.level === 2) || [];
+  const level3Categories = categories?.filter(cat => cat.level === 3) || [];
 
   useEffect(() => {
     dispatch(getCategories());
-    dispatch(findProducts({
-      isNewArrival: true,
-      sort: "createdAt_desc",
-      pageSize: 6,
-      pageNumber: 1,
-      filters: {
-        isNewArrival: true
-      }
-    }));
   }, [dispatch]);
 
+  // Add this function to filter out duplicate products
+  const getUniqueProducts = (products) => {
+    const seen = new Set();
+    return products.filter(product => {
+      const duplicate = seen.has(product._id);
+      seen.add(product._id);
+      return !duplicate;
+    });
+  };
+
+  // Function to get category name for a product
+  const getCategoryNameForProduct = (product) => {
+    if (!product || !product.category || !categories) return '';
+    const categoryId = typeof product.category === 'string' ? product.category : product.category._id;
+    const category = categories.find(cat => cat._id === categoryId);
+    return category ? category.name : '';
+  };
+
+  // Group products by category for better display
+  const groupProductsByCategory = (products) => {
+    const grouped = {};
+    products.forEach(product => {
+      const categoryId = product?.category?._id || product?.category;
+      if (!categoryId) return;
+      if (!grouped[categoryId]) grouped[categoryId] = [];
+      grouped[categoryId].push(product);
+    });
+    return grouped;
+  };
+
+  // Fetch new arrivals per level 3 category using server-side filtering
   useEffect(() => {
-    if (customersProduct?.products?.content) {
-      const newArrivalProducts = customersProduct.products.content.filter(product => product.isNewArrival);
-      setNewArrivals(newArrivalProducts);
-    }
-  }, [customersProduct?.products?.content]);
+    const fetchCategoryNewArrivals = async (categoryId) => {
+      const collected = [];
+      let pageNumber = 1;
+      const pageSize = 200;
+      let totalPages = 1;
+      do {
+        const params = new URLSearchParams();
+        params.append('pageNumber', String(pageNumber));
+        params.append('pageSize', String(pageSize));
+        params.append('category', categoryId);
+        params.append('isNewArrival', 'true');
+        const url = `${API_BASE_URL}/api/products?${params.toString()}`;
+        const response = await axios.get(url);
+        const data = response.data || {};
+        const content = Array.isArray(data.content) ? data.content : [];
+        totalPages = Number(data.totalPages || 1);
+        for (const p of content) {
+          collected.push(p);
+        }
+        pageNumber += 1;
+      } while (pageNumber <= totalPages);
+      return getUniqueProducts(collected);
+    };
+
+    const fetchAll = async () => {
+      if (!level3Categories || level3Categories.length === 0) return;
+      try {
+        const entries = await Promise.all(
+          level3Categories.map(async (cat) => {
+            const prods = await fetchCategoryNewArrivals(cat._id);
+            return [cat._id, prods];
+          })
+        );
+        setNewArrivalsByCategory(Object.fromEntries(entries));
+      } catch (e) {
+        console.error('Error fetching per-category new arrivals:', e);
+      }
+    };
+
+    fetchAll();
+  }, [level3Categories]);
+
+  // Add intersection observer for lazy loading images
+  useEffect(() => {
+    // Create an intersection observer to handle lazy loading
+    const options = {
+      rootMargin: '100px 0px',
+      threshold: 0.1
+    };
+    
+    const handleIntersection = (entries, observer) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          
+          // Replace the placeholder with the actual image source
+          if (img.dataset.src) {
+            img.src = img.dataset.src;
+            img.classList.add('loaded');
+            observer.unobserve(img);
+          }
+        }
+      });
+    };
+    
+    const observer = new IntersectionObserver(handleIntersection, options);
+    
+    // Target all images with lazyload class
+    const lazyImages = document.querySelectorAll('img.lazyload');
+    lazyImages.forEach(img => observer.observe(img));
+    
+    return () => {
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, [categories]);
 
   const handleCategoryClick = (categoryId) => {
     // First check if we have categories loaded
     if (!categories?.length) {
-      console.log('Categories not loaded yet');
       return;
     }
 
     // Find the category and check if it exists
     const category = categories.find(cat => cat._id === categoryId);
     if (!category) {
-      console.log('Category not found:', categoryId);
       return;
     }
 
@@ -232,23 +339,24 @@ const Homepage = () => {
     // If it's a level 2 category, check for level 3 subcategories
     if (isSubcategory) {
       const hasLevel3Categories = categories.some(cat => 
-        cat.level === 3 && cat.parentCategory?._id === categoryId
+        cat.level === 3 && cat.parentCategory && cat.parentCategory._id === categoryId
       );
 
       // Log for debugging
-      console.log('Homepage Category Click (Level 2):', {
+      console.log('Category navigation details:', {
         categoryId,
         categoryName: category.name,
         level: category.level,
         hasLevel3Categories,
-        parentCategory: category.parentCategory
+        parentCategory: category.parentCategory,
+        level3Categories: categories.filter(cat => cat.level === 3 && cat.parentCategory && cat.parentCategory._id === categoryId)
       });
 
-      if (hasLevel3Categories) {
-        navigate(`/category/${categoryId}`);
-      } else {
-        navigate(`/category/coming-soon/${categoryId}`);
-      }
+                      if (hasLevel3Categories) {
+                  navigate(`/category/${category.slug || categoryId}`);
+                } else {
+                  navigate(`/category/coming-soon/${category.slug || categoryId}`);
+                }
       return;
     }
 
@@ -256,19 +364,19 @@ const Homepage = () => {
     const hasSubcategories = level2Categories.some(cat => cat.parentCategory?._id === categoryId);
 
     // Log for debugging
-    console.log('Homepage Category Click (Level 1):', {
+    console.log('Category navigation:', {
       categoryId,
       categoryName: category.name,
       level: category.level,
       hasSubcategories
     });
 
-    // Navigate based on subcategories
-    if (hasSubcategories) {
-      navigate(`/category/${categoryId}`);
-    } else {
-      navigate(`/category/coming-soon/${categoryId}`);
-    }
+                // Navigate based on subcategories
+            if (hasSubcategories) {
+              navigate(`/category/${category.slug || categoryId}`);
+            } else {
+              navigate(`/category/coming-soon/${category.slug || categoryId}`);
+            }
   };
 
   const getSubcategories = (parentId) => {
@@ -279,110 +387,161 @@ const Homepage = () => {
     <div>
       {/* Hero Slider Section */}
       <section className="slider-area position-relative">
-        <HomeCarousel />
+        <Box>
+          <HomeCarousel />
+        </Box>
       </section>
 
-      {/* New Arrivals Section */}
-      {newArrivals.length > 0 && (
-        <section style={{ padding: '0' }}>
-          <Container maxWidth={false} sx={{ px: { xs: 0, sm: 0, md: 0 } }}>
-            <Typography 
-              variant="h4" 
-              component="h2" 
-              sx={{ 
-                ml: 4,
-                mb: 2,
-                fontWeight: 'bold',
-                color: '#000',
-                fontSize: { xs: '1.5rem', sm: '2rem' },
-                textTransform: 'uppercase',
-                letterSpacing: '1px'
-              }}
-            >
-              New Arrival
-            </Typography>
-            <Box sx={{ 
+      {/* New Arrivals Per Level 3 Category */}
+      {Object.keys(newArrivalsByCategory).length > 0 && (
+        <section style={{ padding: '1.5rem 0', minHeight: '60vh' }} ref={newArrivalsRef}>
+          <Container maxWidth={false} sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
+            <Box sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
               position: 'relative',
-              overflow: 'hidden',
-              '& .splide': {
-                padding: '0',
-                overflow: 'hidden'
-              },
-              '& .splide__slide': {
-                height: 'auto',
-                padding: '0',
-                margin: '0',
-                overflow: 'hidden'
-              },
-              '& .splide__list': {
-                gap: '0',
-                margin: '0',
-                padding: '0',
-                overflow: 'visible'
-              },
-              '& .splide__track': {
-                overflow: 'hidden',
-                padding: '0'
-              }
+              mb: 4,
+              overflow: 'hidden'
             }}>
-              <Splide
-                options={{
-                  type: 'loop',
-                  perPage: 3,
-                  perMove: 1,
-                  gap: '1.5rem',
-                  padding: { left: '8rem', right: '8rem' },
-                  arrows: true,
-                  pagination: false,
-                  autoplay: true,
-                  interval: 3000,
-                  height: 'auto',
-                  focus: false,
-                  drag: true,
-                  speed: 1000,
-                  breakpoints: {
-                    1200: {
-                      perPage: 3,
-                      gap: '1.5rem',
-                      padding: { left: '8rem', right: '8rem' }
-                    },
-                    768: {
-                      perPage: 2,
-                      gap: '1rem',
-                      padding: { left: '4rem', right: '4rem' }
-                    },
-                    480: {
-                      perPage: 1,
-                      gap: '1rem',
-                      padding: { left: '2rem', right: '2rem' }
+              <Box sx={{
+                width: '100%',
+                maxWidth: '90%',
+                textAlign: 'center',
+                position: 'relative',
+                py: 2,
+                '&::before, &::after': {
+                  content: '""',
+                  position: 'absolute',
+                  height: '2px',
+                  width: '100%',
+                  background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.8) 50%, rgba(0,0,0,0) 100%)',
+                  left: 0
+                },
+                '&::before': { top: 0 },
+                '&::after': { bottom: 0 }
+              }}>
+                <Typography 
+                  variant="h3" 
+                  component="h2" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: '#000',
+                    fontSize: { xs: '1.8rem', sm: '2.2rem', md: '2.5rem' },
+                    textTransform: 'uppercase',
+                    letterSpacing: '3px',
+                    position: 'relative',
+                    display: 'inline-block',
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      bottom: '-8px',
+                      left: '25%',
+                      width: '50%',
+                      height: '3px',
+                      backgroundColor: '#000'
                     }
-                  }
-                }}
-              >
-                {newArrivals.slice(0, 6).map((product) => (
-                  <SplideSlide key={product._id}>
-                    <Box 
-                      sx={{ 
-                        p: 0,
-                        m: 0,
-                        height: '100%',
-                        '& > *': { margin: 0, padding: 0 }
-                      }}
-                    >
-                      <ProductWrapper>
-                        <HomeProductCard product={product} />
-                      </ProductWrapper>
-                    </Box>
-                  </SplideSlide>
-                ))}
-              </Splide>
+                  }}
+                >
+                  NEW ARRIVALS BY CATEGORY
+                </Typography>
+              </Box>
             </Box>
+
+            {level3Categories.map((cat) => {
+              const products = newArrivalsByCategory[cat._id] || [];
+              if (!products.length) return null;
+              return (
+                <Box key={cat._id} sx={{ mb: 6 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+                    {cat.name}
+                  </Typography>
+                  <Suspense fallback={<div style={{ height: '400px' }} />}> 
+                    <NewArrivalsCarousel 
+                      products={products}
+                      getCategoryNameForProduct={getCategoryNameForProduct}
+                      inView={newArrivalsInView}
+                    />
+                  </Suspense>
+                </Box>
+              );
+            })}
           </Container>
         </section>
       )}
 
       {/* Categories Section */}
-      <section style={{ width: '100vw', margin: 0, padding: 0 }}>
+      <section style={{ width: '100%', margin: 0, padding: '1.5rem 0 0 0', minHeight: '80vh' }} id="categories-section">
+        <Container maxWidth={false} sx={{ px: { xs: 2, sm: 3, md: 4 }, mb: 3 }}>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            position: 'relative',
+            mb: 3,
+            overflow: 'hidden'
+          }}>
+            <Box sx={{
+              width: '100%',
+              maxWidth: '90%',
+              textAlign: 'center',
+              position: 'relative',
+              py: 2,
+              '&::before, &::after': {
+                content: '""',
+                position: 'absolute',
+                height: '2px',
+                width: '100%',
+                background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.8) 50%, rgba(0,0,0,0) 100%)',
+                left: 0
+              },
+              '&::before': {
+                top: 0
+              },
+              '&::after': {
+                bottom: 0
+              }
+            }}>
+              <Typography 
+                variant="h3" 
+                component="h2" 
+                sx={{ 
+                  fontWeight: 600,
+                  color: '#000',
+                  fontSize: { xs: '1.8rem', sm: '2.2rem', md: '2.5rem' },
+                  textTransform: 'uppercase',
+                  letterSpacing: '3px',
+                  position: 'relative',
+                  display: 'inline-block',
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    bottom: '-8px',
+                    left: '25%',
+                    width: '50%',
+                    height: '3px',
+                    backgroundColor: '#000'
+                  }
+                }}
+              >
+                SHOP BY CATEGORY
+              </Typography>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  mt: 2,
+                  color: '#555',
+                  fontStyle: 'italic',
+                  fontWeight: 400,
+                  letterSpacing: '1px',
+                  fontSize: { xs: '0.9rem', sm: '1rem' }
+                }}
+              >
+                Explore our curated collections
+              </Typography>
+            </Box>
+          </Box>
+        </Container>
         {level1Categories.map((category) => {
           const subcategories = getSubcategories(category._id);
           const hasProducts = category.products && category.products.length > 0;
@@ -396,7 +555,7 @@ const Homepage = () => {
                     height: { xs: '50vh', sm: '60vh', md: '70vh' }
                   }}>
                     <Box
-                      onClick={() => navigate(`/category/coming-soon/${category._id}`)}
+                      onClick={() => navigate(`/category/coming-soon/${category.slug || category._id}`)}
                       sx={{
                         width: '100%',
                         height: '100%',
@@ -474,7 +633,16 @@ const Homepage = () => {
 
           // Show regular category view for categories with subcategories or products
           return (
-            <Box key={category._id} sx={{ width: '100%', mb: { xs: 0.5, md: 1 } }}>
+            <Box key={category._id} sx={{ 
+              width: '100%', 
+              mb: { xs: 0.5, md: 1 },
+              // Optimize rendering
+              contentVisibility: 'auto',
+              containIntrinsicSize: '0 600px',
+              // Hardware acceleration
+              willChange: 'transform',
+              transform: 'translateZ(0)'
+            }}>
               <Grid container spacing={{ xs: 0.5, md: 1 }}>
                 {subcategories.length > 0 ? (
                   // If has subcategories, show them
@@ -499,17 +667,31 @@ const Homepage = () => {
                             }
                           }
                         }}
+                        className="image-container"
                       >
                         <Box
                           component="img"
-                          src={`${process.env.REACT_APP_API_URL}${subCategory.imageUrl}`}
+                          src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" // Tiny placeholder
+                          data-src={`${process.env.REACT_APP_API_URL}${subCategory.imageUrl}`}
                           alt={subCategory.name}
+                          className="center-image lazyload"
+                          loading="lazy"
+                          width="1920"
+                          height="1080"
                           sx={{
                             width: '100%',
                             height: '100%',
+                            transition: 'transform 0.4s ease',
+                            display: 'block', 
+                            margin: '0 auto',
+                            // Image quality optimization
                             objectFit: 'cover',
-                            transition: 'all 0.6s ease',
-                          }}
+                            filter: 'brightness(1.02)',
+                            // Optimize memory consumption
+                            imageRendering: { xs: 'optimizeSpeed', md: 'auto' },
+                            // Prevent layout shift
+                            aspectRatio: '16/9'
+                          }}  
                         />
                         <Box
                           className="category-overlay"
@@ -518,14 +700,20 @@ const Homepage = () => {
                             bottom: 0,
                             left: 0,
                             right: 0,
-                            background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%)',
+                            // Simplified gradient for better performance
+                            background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)',
                             height: '100%',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'flex-end',
                             alignItems: 'center',
-                            padding: { xs: '2rem', sm: '3rem', md: '4rem' },
-                            transition: 'all 0.3s ease',
+                            padding: { xs: '1.5rem', sm: '2rem', md: '3rem' },
+                            // Reduced transition properties
+                            transition: 'opacity 0.2s ease',
+                            // Prevent repaints during scroll
+                            willChange: 'opacity',
+                            // Hardware acceleration
+                            transform: 'translateZ(0)'
                           }}
                         >
                           <Typography
@@ -564,7 +752,7 @@ const Homepage = () => {
                               // For level 2 categories, check for level 3 subcategories
                               if (subCategory.level === 2) {
                                 const hasLevel3Categories = categories.some(cat => 
-                                  cat.level === 3 && cat.parentCategory?._id === subCategory._id
+                                  cat.level === 3 && cat.parentCategory && cat.parentCategory._id === subCategory._id
                                 );
                                 return hasLevel3Categories ? 'View Collection' : 'Coming Soon';
                               }
@@ -597,16 +785,30 @@ const Homepage = () => {
                           }
                         }
                       }}
+                      className="image-container"
                     >
                       <Box
                         component="img"
-                        src={`${process.env.REACT_APP_API_URL}${category.imageUrl}`}
+                        src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" // Tiny placeholder
+                        data-src={`${process.env.REACT_APP_API_URL}${category.imageUrl}`}
                         alt={category.name}
+                        className="center-image lazyload"
+                        loading="lazy"
+                        width="1920"
+                        height="1080"
                         sx={{
                           width: '100%',
                           height: '100%',
+                          transition: 'transform 0.4s ease',
+                          display: 'block',
+                          margin: '0 auto',
+                          // Proper image aspect ratio to prevent layout shifts
+                          aspectRatio: '16/9',
+                          // Image quality optimization with CSS filters instead of overlays
                           objectFit: 'cover',
-                          transition: 'all 0.6s ease',
+                          filter: 'brightness(1.05) contrast(1.02)',
+                          // Optimize memory consumption
+                          imageRendering: { xs: 'auto', md: 'auto' }
                         }}
                       />
                       <Box
@@ -616,14 +818,15 @@ const Homepage = () => {
                           bottom: 0,
                           left: 0,
                           right: 0,
-                          background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%)',
+                          // Remove black overlay shadows entirely
+                          background: 'none',
                           height: '100%',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'flex-end',
                           alignItems: 'center',
                           padding: { xs: '2rem', sm: '3rem', md: '4rem' },
-                          transition: 'all 0.3s ease',
+                          transition: 'transform 0.3s ease',
                         }}
                       >
                         <Typography
@@ -632,7 +835,8 @@ const Homepage = () => {
                             fontWeight: 600,
                             textTransform: 'uppercase',
                             letterSpacing: { xs: '0.1em', md: '0.15em' },
-                            textShadow: '2px 2px 4px rgba(0,0,0,0.4)',
+                            // Enhanced text shadow for readability without overlay
+                            textShadow: '0 2px 4px rgba(0,0,0,0.7), 0 4px 8px rgba(0,0,0,0.5), 0 8px 16px rgba(0,0,0,0.3)',
                             textAlign: 'center',
                             color: 'white',
                             fontSize: { 
@@ -641,7 +845,11 @@ const Homepage = () => {
                               md: '2.5rem'
                             },
                             lineHeight: 1.2,
-                            mb: { xs: 1, md: 2 }
+                            mb: { xs: 1, md: 2 },
+                            // Add a subtle background for legibility
+                            padding: '0.5rem',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(0,0,0,0.2)'
                           }}
                         >
                           {category.name}
@@ -649,13 +857,18 @@ const Homepage = () => {
                         <Typography
                           variant="subtitle1"
                           sx={{
-                            color: 'rgba(255, 255, 255, 0.9)',
+                            color: 'rgba(255, 255, 255, 0.95)',
                             textTransform: 'uppercase',
                             letterSpacing: '0.2em',
                             fontSize: { xs: '0.8rem', md: '0.9rem' },
                             fontWeight: 500,
                             textAlign: 'center',
-                            opacity: 0.9
+                            // Add subtle text shadow for better contrast
+                            textShadow: '0 1px 2px rgba(0,0,0,0.8), 0 2px 4px rgba(0,0,0,0.4)',
+                            // Add a subtle background for better legibility
+                            padding: '0.2rem 1rem',
+                            borderRadius: '2px',
+                            backgroundColor: 'rgba(0,0,0,0.15)'
                           }}
                         >
                           {(() => {

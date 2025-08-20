@@ -1,9 +1,12 @@
 const mongoose = require('mongoose');
 const Cart = require('./models/cart.model.js');
 const CartItem = require('./models/cartItem.model.js');
+require('dotenv').config();
+
+const MONGODB_URL = process.env.MONGODB_URL || 'mongodb://localhost:27017/tweestbd';
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/tweestbd')
+mongoose.connect(MONGODB_URL)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 

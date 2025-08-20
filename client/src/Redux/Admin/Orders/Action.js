@@ -29,15 +29,37 @@ import {
 export const getOrders = (reqData) => async (dispatch) => {
   dispatch(getOrdersRequest());
   try {
-    const response = await api.get(`/api/admin/orders`, {
+    // Prepare URL with query parameters if filters are provided
+    let url = `/api/admin/orders`;
+    const { filters } = reqData;
+    
+    if (filters && Object.keys(filters).length > 0) {
+      // Convert filters object to URL query parameters
+      const queryParams = new URLSearchParams();
+      
+      if (filters.orderStatus) {
+        queryParams.append('orderStatus', filters.orderStatus);
+      }
+      
+      if (filters.sortBy) {
+        queryParams.append('sortBy', filters.sortBy);
+      }
+      
+      // Add any other filter parameters here if needed
+      
+      // Append query parameters to URL if there are any
+      if (queryParams.toString()) {
+        url += `?${queryParams.toString()}`;
+      }
+    }
+    
+    const response = await api.get(url, {
       headers: {
         Authorization: `Bearer ${reqData.jwt}`,
       },
     });
-    console.log("orders from api: ", response.data);
     dispatch(getOrdersSuccess(response.data));
   } catch (error) {
-    console.log("catch error: ", error);
     dispatch(getOrdersFailure(error.message));
   }
 };
@@ -56,7 +78,6 @@ export const confirmOrder = (orderId) => async (dispatch) => {
       }
     );
     const data = response.data;
-    console.log("confirm_order ", data);
     dispatch(confirmedOrderSuccess(data));
   } catch (error) {
     console.error("Error confirming order:", error);
@@ -77,7 +98,6 @@ export const shipOrder = (orderId) => async (dispatch) => {
         },
       }
     );
-    console.log("shipped order", data);
     dispatch(shipOrderSuccess(data));
   } catch (error) {
     console.error("Error shipping order:", error);
@@ -99,7 +119,6 @@ export const deliveredOrder = (orderId) => async (dispatch) => {
       }
     );
     const data = response.data;
-    console.log("delivered order ", data);
     dispatch(deliveredOrderSuccess(data));
   } catch (error) {
     console.error("Error delivering order:", error);
@@ -141,10 +160,8 @@ export const deleteOrder = (orderId) => async (dispatch) => {
         },
       }
     );
-    console.log("delete order ", data);
     dispatch(deleteOrderSuccess(orderId));
   } catch (error) {
-    console.log("catch error ", error);
     dispatch(deleteOrderFailure(error));
   }
 };

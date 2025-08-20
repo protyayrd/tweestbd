@@ -25,16 +25,36 @@ import CreateProduct from "../customer/Components/Create/CreateProduct";
 import "./AdminPannel.css";
 import ProductsTable from "./componets/Products/ProductsTable";
 import OrdersTable from "./componets/Orders/OrdersTable";
-import Customers from "./componets/customers/customers";
+import CustomerManagement from "./componets/customers/CustomerManagement";
 import UpdateProductForm from "./componets/updateProduct/UpdateProduct";
 import CategoryManagement from "./componets/Categories/CategoryManagement";
 import { useDispatch, useSelector } from "react-redux";
-import { getUser, logout } from "../Redux/Auth/Action";
-import { useEffect } from "react";
-import { deepPurple } from "@mui/material/colors";
+import { getUser, verifyAdminAccess } from "../Redux/Auth/Action";
+import { loadAdminReducers } from "../Redux/Store";
+import AdminErrorBoundary from "./components/ErrorBoundary";
+import { useEffect, useState } from "react";
 import FeaturedCategories from './componets/Categories/FeaturedCategories';
 import ProductDetails from "./componets/Products/ProductDetails";
 import PromoCodeList from "./componets/PromoCode/PromoCodeList";
+import TshirtOrders from './Views/TshirtOrders';
+import LocalMallIcon from '@mui/icons-material/LocalMall';
+import SettingsIcon from '@mui/icons-material/Settings';
+import JerseyFormSettings from './components/JerseyFormSettings/JerseyFormSettings';
+import StraightenIcon from '@mui/icons-material/Straighten';
+import SizeGuideManager from './componets/SizeGuides/SizeGuideManager';
+import PaymentIcon from '@mui/icons-material/Payment';
+import PaymentsPage from './Views/PaymentsPage';
+import ReviewsManagement from './componets/Reviews/ReviewsManagement';
+import ReviewsIcon from '@mui/icons-material/Reviews';
+import ImageIcon from '@mui/icons-material/Image';
+import PopupImageManager from './componets/PopupImages/PopupImageManager';
+import DescriptionIcon from '@mui/icons-material/Description';
+import PredefinedDescriptionManager from './componets/PredefinedDescriptions/PredefinedDescriptionManager';
+import { ScrollToTop } from '../components';
+import ComboOffersTable from './componets/ComboOffers/ComboOffersTable';
+import ComboOfferForm from './componets/ComboOffers/ComboOfferForm';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import { CircularProgress, Typography } from '@mui/material';
 
 const drawerWidth = 240;
 
@@ -44,44 +64,135 @@ const menu = [
   {name:"Categories",path:"/admin/categories"},
   {name:"Customers",path:"/admin/customers"},
   {name:"Orders",path:"/admin/orders"},
+  {name:"Payments",path:"/admin/payments", icon: <PaymentIcon />},
   {name:"Promo Codes",path:"/admin/promo-codes"},
-  {name:"Total Earnings",path:"/admin"},
-  {name:"Weekly Overview",path:"/admin"},
-  {name:"Monthly Overview",path:"/admin"},
-  {name:"Add Product",path:"/admin/product/create"},
   {name:"Featured Categories",path:"/admin/featured-categories"},
+  {name:"Reviews",path:"/admin/reviews", icon: <ReviewsIcon />},
+  {name: "T-shirt Orders", path: "/admin/tshirt-orders", icon: <LocalMallIcon />},
+  {name: "Jersey Form Settings", path: "/admin/jersey-form-settings", icon: <SettingsIcon />},
+  {name: "Size Guides", path: "/admin/size-guides", icon: <StraightenIcon />},
+  {name: "Popup Images", path: "/admin/popup-images", icon: <ImageIcon />},
+  {name: "Predefined Descriptions", path: "/admin/predefined-descriptions", icon: <DescriptionIcon />},
+  {name: "Combo Offers", path: "/admin/combo-offers", icon: <LocalOfferIcon />},
 ];
 
 export default function AdminPannel() {
   const theme = useTheme();
   const isLargeScreen = useMediaQuery(theme.breakpoints.up("lg"));
   const [sideBarVisible, setSideBarVisible] = React.useState(false);
+  const [adminVerified, setAdminVerified] = useState(false);
+  const [verificationLoading, setVerificationLoading] = useState(true);
+  const [verificationError, setVerificationError] = useState(null);
   const navigate=useNavigate();
   const dispatch=useDispatch()
   const {auth}=useSelector(store=>store);
 
-  const handleLogout = () => {
-   
-    dispatch(logout());
-    navigate("/")
-
-  };
-
   const jwt = localStorage.getItem("jwt");
 
   useEffect(() => {
-    if (jwt) {
-      dispatch(getUser(jwt));
-    } else {
-      navigate('/login');
-    }
-  }, [jwt]);
+    const verifyAccess = async () => {
+      if (!jwt) {
+        navigate('/login');
+        return;
+      }
 
-  useEffect(() => {
-    if (!auth.user || auth.user.role !== 'ADMIN') {
-      navigate('/login');
-    }
-  }, [auth.user]);
+      try {
+        setVerificationLoading(true);
+        setVerificationError(null);
+        
+        // Load admin reducers first to ensure admin state is available
+        console.log('Loading admin reducers...');
+        await loadAdminReducers();
+        console.log('Admin reducers loaded successfully');
+        
+        // Add a small delay to ensure the app is fully initialized
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verify admin access on backend
+        const adminVerification = await dispatch(verifyAdminAccess());
+        
+        if (adminVerification && adminVerification.isAdmin) {
+          setAdminVerified(true);
+        } else {
+          setVerificationError("Admin access denied");
+          navigate('/login');
+        }
+      } catch (error) {
+        console.error("Admin verification failed:", error);
+        setVerificationError(error.message || "Authentication failed");
+        
+        // If it's a network error or 401, redirect to login
+        if (!error.response || error.response?.status === 401 || error.response?.status === 403) {
+          navigate('/login');
+        }
+      } finally {
+        setVerificationLoading(false);
+      }
+    };
+
+    verifyAccess();
+  }, [jwt, dispatch, navigate]);
+
+  // Show loading screen while verifying admin access
+  if (verificationLoading) {
+    return (
+      <ThemeProvider theme={customTheme}>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            flexDirection: 'column',
+            gap: 2
+          }}
+        >
+          <CircularProgress size={60} />
+          <Typography variant="h6" color="textSecondary">
+            Loading admin panel...
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            Verifying access and loading components
+          </Typography>
+          {verificationError && (
+            <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+              Error: {verificationError}
+            </Typography>
+          )}
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
+  // Don't render admin panel if admin access is not verified
+  if (!adminVerified) {
+    return (
+      <ThemeProvider theme={customTheme}>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            flexDirection: 'column',
+            gap: 2
+          }}
+        >
+          <Typography variant="h6" color="error">
+            Access Denied
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            You don&apos;t have admin privileges or authentication failed.
+          </Typography>
+          {verificationError && (
+            <Typography variant="body2" color="error">
+              Error: {verificationError}
+            </Typography>
+          )}
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   const drawer = (
     <Box
@@ -89,44 +200,21 @@ export default function AdminPannel() {
         overflow: "auto",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
+        height: "100%"
       }}
     >
       {isLargeScreen && <Toolbar />}
-      <List>
+      <List sx={{ flexGrow: 1 }}>
         {menu.map((item, index) => (
           <ListItem key={item.name} disablePadding onClick={()=>navigate(item.path)}>
             <ListItemButton>
               <ListItemIcon>
-                {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
+                {item.icon || (index % 2 === 0 ? <InboxIcon /> : <MailIcon />)}
               </ListItemIcon>
               <ListItemText primary={item.name} />
             </ListItemButton>
           </ListItem>
         ))}
-      </List>
-
-      <List sx={{ position: "absolute", bottom: 0, width: "100%" }}>
-        <Divider />
-       
-        <ListItem onClick={handleLogout}  disablePadding >
-            <ListItemButton>
-            <Avatar
-                        className="text-white"
-                        onClick={handleLogout}
-                       
-                        sx={{
-                          bgcolor: deepPurple[500],
-                          color: "white",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {auth.user?.firstName[0].toUpperCase()}
-                      </Avatar>
-              <ListItemText className="ml-5" primary={"Logout"} />
-            </ListItemButton>
-          </ListItem>
-        
       </List>
     </Box>
   );
@@ -146,6 +234,7 @@ export default function AdminPannel() {
       <Box sx={{ display: 'flex' }}>
         <CssBaseline />
         <AdminNavbar handleSideBarViewInMobile={handleSideBarViewInMobile} />
+        <ScrollToTop />
 
         <Drawer
           variant={drawerVariant}
@@ -183,21 +272,32 @@ export default function AdminPannel() {
             borderLeft: 0
           }}
         >
-          <Routes>
-            <Route path="/" element={<Dashboard />}></Route>
-            <Route path="/product/create" element={<CreateProductForm/>}></Route>
-            <Route path="/product/update/:productId" element={<UpdateProductForm/>}></Route>
-            <Route path="/product/:productId" element={<ProductDetails/>}></Route>
-            <Route path="/product/edit/:productId" element={<UpdateProductForm/>}></Route>
-            <Route path="/products" element={<ProductsTable/>}></Route>
-            <Route path="/categories" element={<CategoryManagement/>}></Route>
-            <Route path="/orders" element={<OrdersTable/>}></Route>
-            <Route path="/customers" element={<Customers/>}></Route>
-            <Route path="/demo" element={<DemoAdmin />}></Route>
-            <Route path="/featured-categories" element={<FeaturedCategories />} />
-            <Route path="/promo-codes" element={<PromoCodeList />} />
-          </Routes>
-         
+          <AdminErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Dashboard />}></Route>
+              <Route path="/product/create" element={<CreateProductForm/>}></Route>
+              <Route path="/product/update/:productId" element={<UpdateProductForm/>}></Route>
+              <Route path="/product/:productId" element={<ProductDetails/>}></Route>
+              <Route path="/product/edit/:productId" element={<UpdateProductForm/>}></Route>
+              <Route path="/products" element={<ProductsTable/>}></Route>
+              <Route path="/categories" element={<CategoryManagement/>}></Route>
+              <Route path="/combo-offers" element={<ComboOffersTable/>}></Route>
+              <Route path="/combo-offers/create" element={<ComboOfferForm/>}></Route>
+              <Route path="/combo-offers/:id/edit" element={<ComboOfferForm/>}></Route>
+              <Route path="/orders" element={<OrdersTable/>}></Route>
+              <Route path="/customers" element={<CustomerManagement/>}></Route>
+              <Route path="/payments" element={<PaymentsPage />}></Route>
+              <Route path="/demo" element={<DemoAdmin />}></Route>
+              <Route path="/featured-categories" element={<FeaturedCategories />} />
+              <Route path="/promo-codes" element={<PromoCodeList />} />
+              <Route path="/reviews" element={<ReviewsManagement />} />
+              <Route path="/tshirt-orders" element={<TshirtOrders />} />
+              <Route path="/jersey-form-settings" element={<JerseyFormSettings />} />
+              <Route path="/size-guides" element={<SizeGuideManager />} />
+              <Route path="/popup-images" element={<PopupImageManager />} />
+              <Route path="/predefined-descriptions" element={<PredefinedDescriptionManager />} />
+            </Routes>
+          </AdminErrorBoundary>
         </Box>
       </Box>
     </ThemeProvider>

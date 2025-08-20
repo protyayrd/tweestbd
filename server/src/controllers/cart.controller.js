@@ -19,13 +19,8 @@ const findUserCart = async (req, res) => {
         console.log("Finding cart for user:", user._id);
         const cart = await cartService.findUserCart(user._id);
         
-        // Ensure promoDetails has valid values
-        const safePromoDetails = {
-            code: undefined,
-            discountType: 'FIXED',
-            discountAmount: 0,
-            maxDiscountAmount: undefined
-        };
+        // Use actual promo details from cart if they exist, otherwise don't include promo details
+        const actualPromoDetails = cart.promoDetails || null;
         
         const transformedCart = {
             cartItems: cart.cartItems.map(item => ({
@@ -33,7 +28,7 @@ const findUserCart = async (req, res) => {
                 cart: {
                     ...item.cart,
                     promoCodeDiscount: cart.promoCodeDiscount || 0,
-                    promoDetails: safePromoDetails
+                    promoDetails: actualPromoDetails
                 },
                 product: item.product,
                 size: item.size,
@@ -51,7 +46,7 @@ const findUserCart = async (req, res) => {
             discount: cart.discount,
             totalItem: cart.totalItem,
             promoCodeDiscount: cart.promoCodeDiscount || 0,
-            promoDetails: safePromoDetails
+            promoDetails: actualPromoDetails
         };
         
         console.log("Cart found:", transformedCart);
@@ -97,6 +92,7 @@ const addItemToCart = async (req, res) => {
                 product: item.product,
                 size: item.size,
                 color: item.color || null,
+                sku: item.sku || item.product?.sku || null,
                 quantity: item.quantity,
                 userId: item.userId,
                 createdAt: item.createdAt,
@@ -110,12 +106,7 @@ const addItemToCart = async (req, res) => {
             discount: cart.discount || 0,
             totalItem: cart.totalItem || 0,
             promoCodeDiscount: cart.promoCodeDiscount || 0,
-            promoDetails: {
-                code: undefined,
-                discountType: 'FIXED',
-                discountAmount: 0,
-                maxDiscountAmount: undefined
-            }
+            promoDetails: cart.promoDetails || null
         };
         
         console.log("Item added successfully, returning cart:", transformedCart);
@@ -161,12 +152,7 @@ const removeCartItem = async (req, res) => {
             discount: cart.discount || 0,
             totalItem: cart.totalItem || 0,
             promoCodeDiscount: cart.promoCodeDiscount || 0,
-            promoDetails: cart.promoDetails || {
-                code: undefined,
-                discountType: 'FIXED',
-                discountAmount: 0,
-                maxDiscountAmount: undefined
-            }
+            promoDetails: cart.promoDetails || null
         });
     } catch (error) {
         console.error("Error in removeCartItem:", error);
@@ -217,12 +203,7 @@ const updateCartItem = async (req, res) => {
             discount: cart.discount || 0,
             totalItem: cart.totalItem || 0,
             promoCodeDiscount: cart.promoCodeDiscount || 0,
-            promoDetails: cart.promoDetails || {
-                code: undefined,
-                discountType: 'FIXED',
-                discountAmount: 0,
-                maxDiscountAmount: undefined
-            },
+            promoDetails: cart.promoDetails || null,
             promoCode: cart.promoCode || null
         };
         
@@ -536,6 +517,51 @@ const removePromoCode = async (req, res) => {
     }
 };
 
+const clearCart = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user || !user._id) {
+            return res.status(401).json({
+                message: "User not authenticated",
+                status: false
+            });
+        }
+
+        console.log("Clearing cart for user:", user._id);
+        
+        // Clear the existing cart and create a new one
+        const newCart = await cartService.clearCart(user._id);
+        
+        console.log("Cart cleared and new cart created successfully:", newCart);
+        res.status(200).json({
+            message: "Cart cleared successfully",
+            status: true,
+            cart: {
+                _id: newCart._id,
+                cartItems: [],
+                totalPrice: 0,
+                totalDiscountedPrice: 0,
+                discount: 0,
+                totalItem: 0,
+                promoCodeDiscount: 0,
+                promoDetails: {
+                    code: null,
+                    discountType: 'FIXED',
+                    discountAmount: 0,
+                    maxDiscountAmount: null
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error in clearCart:", error);
+        res.status(500).json({ 
+            message: "Failed to clear cart", 
+            error: error.message,
+            status: false
+        });
+    }
+};
+
 module.exports = {
     findUserCart,
     addItemToCart,
@@ -543,5 +569,6 @@ module.exports = {
     updateCartItem,
     getCartItem,
     applyPromoCode,
-    removePromoCode
+    removePromoCode,
+    clearCart
 };

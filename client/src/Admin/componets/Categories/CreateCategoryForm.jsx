@@ -84,7 +84,6 @@ const CreateCategoryForm = () => {
     data.append('image', imageFile);
 
     try {
-      console.log('Submitting category with data:', {
         name: formData.name,
         level: formData.level,
         description: formData.description,

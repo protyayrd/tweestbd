@@ -10,5 +10,8 @@ router.put("/:orderId/ship",authenticate,isAdmin,adminOrderController.shippOrder
 router.put("/:orderId/deliver",authenticate,isAdmin,adminOrderController.deliverOrder);
 router.put("/:orderId/cancel",authenticate,isAdmin,adminOrderController.cancelledOrder);
 router.delete("/:orderId/delete",authenticate,isAdmin,adminOrderController.deleteOrder);
+router.put("/:orderId/mark-due-paid",authenticate,isAdmin,adminOrderController.markDuePaid);
+router.post("/outlet",authenticate,isAdmin,adminOrderController.createOutletOrder);
+router.post("/:orderId/send-sms",authenticate,isAdmin,adminOrderController.sendSMSToShippingAddress);
 
 module.exports=router;

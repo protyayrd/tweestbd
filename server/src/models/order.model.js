@@ -5,7 +5,22 @@ const orderSchema = new Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'users',
-    required: true,
+    required: function() { return !this.isGuestOrder; }
+  },
+  isGuestOrder: {
+    type: Boolean,
+    default: false
+  },
+  guestPhone: {
+    type: String,
+    required: function() { return this.isGuestOrder; }
+  },
+  guestEmail: {
+    type: String
+  },
+  formattedOrderId: {
+    type: String,
+    unique: true
   },
   orderItems: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -27,8 +42,8 @@ const orderSchema = new Schema({
   paymentDetails: {
     paymentMethod: {
       type: String,
-      enum: ['CASH', 'CARD', 'UPI', 'SSLCommerz'],
-      default: 'CASH'
+      enum: ['SSLCommerz', 'bKash', 'COD', 'Outlet'],
+      default: 'SSLCommerz'
     },
     transactionId: {
       type: String
@@ -40,7 +55,38 @@ const orderSchema = new Schema({
       type: String,
       enum: ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'],
       default: 'PENDING'
+    },
+    status: {
+      type: String,
+      enum: ['PENDING', 'COMPLETED', 'PARTIAL', 'FAILED', 'CANCELLED'],
+      default: 'PENDING'
+    },
+    deliveryChargePaid: {
+      type: Boolean,
+      default: false
+    },
+    remainingAmountDue: {
+      type: Number,
+      default: 0
+    },
+    dueAmount: {
+      type: Number,
+      default: 0
+    },
+    dueStatus: {
+      type: String,
+      enum: ['NONE', 'PENDING', 'PAID'],
+      default: 'NONE'
     }
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['PENDING', 'COMPLETED', 'COD_PENDING', 'COD_PARTIAL', 'FREE_PICKUP', 'FAILED', 'REFUNDED'],
+    default: 'PENDING'
+  },
+  paymentOption: {
+    type: String,
+    enum: ['sslcommerz', 'bkash', 'cod', 'outlet', 'online']
   },
   totalPrice: {
     type: Number,
@@ -70,6 +116,21 @@ const orderSchema = new Schema({
     default: 0,
     min: 0
   },
+  shippingCharges: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  dueAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  dueStatus: {
+    type: String,
+    enum: ['NONE', 'PENDING', 'PAID'],
+    default: 'NONE'
+  },
   promoDetails: {
     code: {
       type: String,
@@ -77,7 +138,7 @@ const orderSchema = new Schema({
     },
     discountType: {
       type: String,
-      enum: ['FIXED', 'PERCENTAGE'],
+      enum: ['FIXED', 'PERCENTAGE', null],
       default: null
     },
     discountAmount: {
@@ -97,10 +158,19 @@ const orderSchema = new Schema({
     enum: ['PENDING', 'PLACED', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
     default: 'PENDING'
   },
+  pickupLocation: {
+    type: String,
+    default: null
+  },
   totalItem: {
     type: Number,
     required: true,
     min: 1
+  },
+  deliveryCharge: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, {
   timestamps: true,

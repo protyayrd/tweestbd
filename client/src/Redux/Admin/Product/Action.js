@@ -50,7 +50,6 @@ import api, { API_BASE_URL } from "../../../config/api";
 //       payload: data,
 //     });
 
-//     console.log("created product ", data);
 //   } catch (error) {
 //     dispatch({
 //       type: CREATE_PRODUCT_FAILURE,

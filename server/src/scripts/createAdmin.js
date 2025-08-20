@@ -11,12 +11,13 @@ const createAdminUser = async () => {
 
     // Admin user data
     const adminData = {
-      firstName: 'Admin',
-      lastName: 'User',
-      email: 'admin@tweestbd.com',
-      password: 'admin123',  // This will be hashed
+      firstName: 'Tweest',
+      lastName: 'BD',
+      email: 'tweestbd@gmail.com',
+      password: 'Tweest2233@@##',  // This will be hashed
       role: 'ADMIN',
-      mobile: '1234567890'
+      mobile: '1234567890',
+      isOTPVerified: true // Set to true to bypass OTP verification
     };
 
     // Check if admin already exists

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { findProducts } from '../../../../Redux/Customers/Product/Action';
@@ -29,7 +29,8 @@ import {
   useMediaQuery,
   Button,
   Divider,
-  TextField
+  TextField,
+  Skeleton
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -61,10 +62,41 @@ const stockOptions = [
 const colors = ['Black', 'White', 'Red', 'Blue', 'Green', 'Gray', 'Navy', 'Brown', 'Beige', 'Pink', 'Purple', 'Yellow', 'Orange'];
 const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
 
+// Add default color mapping for color swatches
+const colorMap = {
+  'black': '#000000',
+  'white': '#FFFFFF',
+  'red': '#FF0000',
+  'blue': '#0000FF',
+  'green': '#008000',
+  'gray': '#808080',
+  'grey': '#808080',
+  'navy': '#000080',
+  'brown': '#A52A2A',
+  'beige': '#F5F5DC',
+  'pink': '#FFC0CB',
+  'purple': '#800080',
+  'yellow': '#FFFF00',
+  'orange': '#FFA500',
+  'gold': '#FFD700',
+  'silver': '#C0C0C0',
+  'maroon': '#800000',
+  'olive': '#808000',
+  'teal': '#008080',
+  'ivory': '#FFFFF0'
+};
+
+// Helper function to get color code
+const getColorCode = (colorName) => {
+  const key = colorName.toLowerCase();
+  return colorMap[key] || key;
+};
+
 const ProductImage = styled('img')({
   width: '100%',
   height: '100%',
   objectFit: 'cover',
+  objectPosition: 'center center',
   position: 'absolute',
   top: 0,
   left: 0,
@@ -73,7 +105,7 @@ const ProductImage = styled('img')({
 
 const ImageContainer = styled(Box)(({ theme }) => ({
   position: 'relative',
-  paddingTop: '135%',
+  paddingTop: '150%',
   overflow: 'hidden',
   border: '1px solid #999',
   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -109,7 +141,7 @@ const ImageContainer = styled(Box)(({ theme }) => ({
     pointerEvents: 'none'
   },
   [theme.breakpoints.down('sm')]: {
-    paddingTop: '180%',
+    paddingTop: '150%',
   }
 }));
 
@@ -140,18 +172,275 @@ const PriceContainer = styled(Box)({
 });
 
 const FilterButton = styled(Button)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  padding: '6px 12px',
-  border: '1px solid #ddd',
-  borderRadius: '4px',
-  color: '#666',
-  textTransform: 'none',
+  backgroundColor: '#000000',
+  color: 'white',
   '&:hover': {
-    backgroundColor: '#f5f5f5'
+    backgroundColor: '#00503a',
+  },
+}));
+
+const FilterChip = styled(Chip)(({ theme }) => ({
+  borderRadius: '4px',
+  fontWeight: 500,
+  '&.MuiChip-filled': {
+    backgroundColor: '#f0f0f0',
+    color: '#000',
+    border: '1px solid #e0e0e0',
+  },
+  '& .MuiChip-deleteIcon': {
+    color: '#666',
+    '&:hover': {
+      color: '#000',
+    },
   }
 }));
+
+const ColorSwatch = styled(Box)(({ color, selected }) => ({
+  width: '24px',
+  height: '24px',
+  borderRadius: '50%',
+  backgroundColor: color.toLowerCase(),
+  border: selected ? '2px solid #000' : '1px solid #ddd',
+  cursor: 'pointer',
+  boxShadow: selected ? '0 0 0 2px white, 0 0 0 3px #666' : 'none',
+  transition: 'all 0.2s ease',
+  '&:hover': {
+    boxShadow: '0 0 0 2px white, 0 0 0 3px #666',
+  }
+}));
+
+const SizeBox = styled(Box)(({ selected }) => ({
+  minWidth: '35px',
+  height: '35px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  border: selected ? '2px solid #000' : '1px solid #ddd',
+  borderRadius: '4px',
+  padding: '0 8px',
+  cursor: 'pointer',
+  backgroundColor: selected ? '#f5f5f5' : 'white',
+  fontWeight: selected ? 'bold' : 'normal',
+  transition: 'all 0.2s ease',
+  '&:hover': {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#999'
+  }
+}));
+
+const PriceSlider = styled(Box)(({ theme }) => ({
+  padding: '0 10px',
+  marginTop: '10px',
+  marginBottom: '20px',
+}));
+
+const FilterAccordion = styled(Accordion)(({ theme }) => ({
+  boxShadow: 'none',
+  '&:not(:last-child)': {
+    borderBottom: '1px solid #eee',
+  },
+  '&:before': {
+    display: 'none',
+  },
+  '& .MuiAccordionSummary-root': {
+    padding: '0 8px',
+    minHeight: '48px',
+    '&.Mui-expanded': {
+      minHeight: '48px',
+    }
+  },
+  '& .MuiAccordionSummary-content': {
+    margin: '12px 0',
+    '&.Mui-expanded': {
+      margin: '12px 0',
+    }
+  },
+  '& .MuiAccordionDetails-root': {
+    padding: '0 16px 16px',
+  },
+}));
+
+// Add this new styled component for the discount chip
+const DiscountChip = styled(Chip)({
+  position: 'absolute',
+  top: '10px',
+  left: '10px',
+  zIndex: 10,
+  backgroundColor: '#00503a',
+  color: '#fff',
+  fontWeight: 600,
+  fontSize: '0.75rem',
+  borderRadius: '4px',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+  '& .MuiChip-label': {
+    padding: '0 8px',
+  }
+});
+
+const ProductSkeleton = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
+  return (
+    <Card sx={{ height: '100%', boxShadow: 'none', borderRadius: 0 }}>
+      <Box sx={{ 
+        position: 'relative', 
+        paddingTop: '150%',
+        border: '1px solid #999',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        background: '#fff',
+        mb: 1
+      }}>
+        <Skeleton 
+          variant="rectangular" 
+          width="100%" 
+          height="100%" 
+          animation="wave"
+          sx={{ 
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            backgroundColor: '#69af5a',
+            opacity: 0.2,
+          }}
+        />
+      </Box>
+      <Box sx={{ p: 1 }}>
+        <Skeleton variant="text" width="70%" height={24} sx={{ backgroundColor: '#69af5a', opacity: 0.2 }} />
+        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+          <Skeleton variant="text" width="30%" height={24} sx={{ backgroundColor: '#69af5a', opacity: 0.2 }} />
+          <Skeleton variant="text" width="20%" height={24} sx={{ backgroundColor: '#69af5a', opacity: 0.2 }} />
+          <Skeleton variant="text" width="25%" height={24} sx={{ backgroundColor: '#69af5a', opacity: 0.2 }} />
+        </Box>
+      </Box>
+    </Card>
+  );
+};
+
+const ProductCardWithLoader = React.memo(({ product, onClick }) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
+  // Memoize image calculations
+  const { primaryImage, secondaryImage, hasDiscount } = useMemo(() => {
+    const primary = product.colors?.[0]?.images?.[0];
+    const secondary = product.colors?.[0]?.images?.[1] || primary;
+    const discount = product.discountedPrice && product.discountedPrice < product.price && product.discountPersent;
+    
+    return {
+      primaryImage: primary,
+      secondaryImage: secondary,
+      hasDiscount: discount
+    };
+  }, [product.colors, product.discountedPrice, product.price, product.discountPersent]);
+
+  const handleImageLoad = useCallback(() => {
+    setImageLoaded(true);
+  }, []);
+
+  return (
+    <ProductCard onClick={onClick}>
+      <ImageContainer>
+        {!imageLoaded && (
+          <Skeleton 
+            variant="rectangular" 
+            width="100%" 
+            height="100%" 
+            animation="wave"
+            sx={{ 
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              backgroundColor: '#69af5a',
+              opacity: 0.2,
+              zIndex: 1
+            }}
+          />
+        )}
+        
+        {/* Add the discount chip if there's a discount */}
+        {hasDiscount && (
+          <DiscountChip 
+            label={`- ${product.discountPersent}%`}
+            size="small"
+          />
+        )}
+        
+        <ProductImage
+          className="primary-image"
+          src={primaryImage ? getImageUrl(primaryImage) : 'https://via.placeholder.com/400x600'}
+          alt={product.title}
+          onLoad={handleImageLoad}
+          onError={(e) => {
+            e.target.src = 'https://via.placeholder.com/400x600';
+            setImageLoaded(true);
+          }}
+          style={{ 
+            opacity: imageLoaded ? 1 : 0,
+            zIndex: 2,
+            objectFit: 'cover',
+            objectPosition: 'center center'
+          }}
+        />
+        <ProductImage
+          className="secondary-image"
+          src={secondaryImage ? getImageUrl(secondaryImage) : 'https://via.placeholder.com/400x600'}
+          alt={`${product.title} - hover`}
+          onError={(e) => {
+            e.target.src = 'https://via.placeholder.com/400x600';
+          }}
+          sx={{ 
+            opacity: 0,
+            zIndex: 2,
+            objectFit: 'cover',
+            objectPosition: 'center center'
+          }}
+        />
+      </ImageContainer>
+      
+      <CardContent>
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            fontSize: '0.9rem',
+            fontWeight: 500,
+            mb: 1,
+            color: '#000'
+          }}
+        >
+          {product.title}
+        </Typography>
+        
+        <PriceContainer>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              fontSize: '0.9rem',
+              fontWeight: 500,
+              color: '#000'
+            }}
+          >
+            Tk. {product.discountedPrice || product.price}
+          </Typography>
+          
+          {hasDiscount && (
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                textDecoration: 'line-through',
+                color: '#666',
+                fontSize: '0.9rem'
+              }}
+            >
+              Tk. {product.price}
+            </Typography>
+          )}
+        </PriceContainer>
+      </CardContent>
+    </ProductCard>
+  );
+});
+
+ProductCardWithLoader.displayName = 'ProductCardWithLoader';
 
 const Product = () => {
   const location = useLocation();
@@ -176,24 +465,28 @@ const Product = () => {
     search: ''
   });
   const [availableFilters, setAvailableFilters] = useState({
-    colors: [],
-    sizes: []
+    colors: colors,
+    sizes: sizes
   });
-  const [filterParams, setFilterParams] = useState({});
+
+  // Calculate mobile container height to take up 90% of viewport
+  const mobileContainerStyle = isMobile ? {
+    minHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column'
+  } : {};
 
   useEffect(() => {
     dispatch(getCategories());
   }, [dispatch]);
 
-  useEffect(() => {
+  // Memoize filter params calculation
+  const filterParams = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const page = parseInt(params.get('page')) || 1;
     const sort = params.get('sort') || '';
     const categoryId = params.get('category');
     const search = params.get('search') || '';
-
-    setCurrentPage(page);
-    setSortBy(sort);
 
     // Create base filter params
     const newFilterParams = {
@@ -212,16 +505,22 @@ const Product = () => {
       isFeatured: filters.isFeatured
     };
 
-    // Handle category filtering - only use subcategories
-    if (categoryId) {
-      // Find the selected category
-      const selectedCategory = category.categories?.find(cat => cat._id === categoryId);
-      
-      if (selectedCategory) {
-        // Only use the category directly, no parent category logic
-        newFilterParams.category = categoryId;
-      }
-    }
+            // Handle category filtering - only use subcategories
+        if (categoryId) {
+          // Resolve categoryId from slug if necessary
+          const selectedCategory = category.categories?.find(cat => cat.slug === categoryId) ||
+                                   category.categories?.find(cat => cat._id === categoryId);
+          
+          if (selectedCategory) {
+            newFilterParams.category = selectedCategory._id;
+            // Canonicalize URL if an ID was used but a slug exists
+            if (selectedCategory.slug && categoryId === selectedCategory._id) {
+              const newSearchParams = new URLSearchParams(location.search);
+              newSearchParams.set('category', selectedCategory.slug);
+              navigate({ search: newSearchParams.toString() }, { replace: true });
+            }
+          }
+        }
 
     // Handle price range
     if (filters.priceRange) {
@@ -230,18 +529,36 @@ const Product = () => {
       newFilterParams.maxPrice = max;
     }
 
-    console.log('Setting filter params:', newFilterParams);
-    setFilterParams(newFilterParams);
-  }, [location.search, filters, category.categories, navigate]);
+    return newFilterParams;
+  }, [location.search, filters, category.categories]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const page = parseInt(params.get('page')) || 1;
+    const sort = params.get('sort') || '';
+
+    setCurrentPage(page);
+    setSortBy(sort);
+  }, [location.search]);
+
+  // Add this effect to update available filters when product data is received
+  useEffect(() => {
+    if (customersProduct.products?.availableFilters) {
+      setAvailableFilters(prevFilters => ({
+        colors: customersProduct.products.availableFilters.colors || prevFilters.colors,
+        sizes: customersProduct.products.availableFilters.sizes || prevFilters.sizes
+      }));
+      
+    }
+  }, [customersProduct.products]);
 
   useEffect(() => {
     if (Object.keys(filterParams).length > 0) {
-      console.log('Fetching products with params:', filterParams);
       dispatch(findProducts(filterParams));
     }
   }, [dispatch, filterParams]);
 
-  const handleSortChange = (event) => {
+  const handleSortChange = useCallback((event) => {
     const value = event.target.value;
     setSortBy(value);
     const searchParams = new URLSearchParams(location.search);
@@ -252,17 +569,21 @@ const Product = () => {
     }
     searchParams.set('page', '1');
     navigate({ search: searchParams.toString() });
-  };
+  }, [location.search, navigate]);
 
-  const handlePageChange = (event, value) => {
+  const handlePageChange = useCallback((event, value) => {
     const searchParams = new URLSearchParams(location.search);
     searchParams.set('page', value);
     navigate({ search: searchParams.toString() });
-  };
+  }, [location.search, navigate]);
 
-  const handleProductClick = (productId) => {
-    window.location.href = `/product/${productId}`;
-  };
+  const handleProductClick = useCallback((productId, product) => {
+    if (product?.slug) {
+      window.location.href = `/p/${product.slug}`;
+    } else {
+      window.location.href = `/product/${productId}`;
+    }
+  }, []);
 
   const handleFilterChange = (type, value) => {
     setFilters(prev => {
@@ -325,276 +646,574 @@ const Product = () => {
       open={isFilterOpen}
       onClose={() => setIsFilterOpen(false)}
       PaperProps={{
-        sx: { width: '320px', p: 2 }
+        sx: { 
+          width: { xs: '85%', sm: '380px' },
+          p: 2,
+          borderRadius: { xs: 0, sm: '0 8px 8px 0' }
+        }
       }}
     >
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Filters</Typography>
-        <IconButton onClick={() => setIsFilterOpen(false)}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        height: '100%'
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 2, 
+          pb: 1, 
+          borderBottom: '1px solid #eee'
+        }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              fontWeight: 600, 
+              fontSize: '1.2rem'
+            }}
+          >
+            Refine Results
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button 
+              size="small" 
+              variant="outlined" 
+              onClick={handleClearFilters}
+              sx={{ 
+                borderRadius: '4px',
+                textTransform: 'none',
+                fontWeight: 500
+              }}
+            >
+              Clear All
+            </Button>
+            <IconButton 
+              onClick={() => setIsFilterOpen(false)}
+              sx={{ p: 0.5 }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </Box>
 
-      <Button 
-        variant="outlined" 
-        fullWidth 
-        onClick={handleClearFilters}
-        sx={{ mb: 2 }}
-      >
-        Clear All
-      </Button>
-
-      <Divider sx={{ mb: 2 }} />
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Accordion defaultExpanded>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>Search</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search products..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              sx={{ mb: 1 }}
-            />
-          </AccordionDetails>
-        </Accordion>
-
-        <Accordion defaultExpanded>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>Price Range</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            {priceRanges.map((range) => (
-              <FormControlLabel
-                key={range.value}
-                control={
-                  <Checkbox
-                    checked={filters.priceRange === range.value}
-                    onChange={() => handleFilterChange('priceRange', range.value)}
-                  />
-                }
-                label={range.label}
-              />
-            ))}
-          </AccordionDetails>
-        </Accordion>
-
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>Discount</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            {discountRanges.map((discount) => (
-              <FormControlLabel
-                key={discount.value}
-                control={
-                  <Checkbox
-                    checked={filters.minDiscount === discount.value}
-                    onChange={() => handleFilterChange('minDiscount', discount.value)}
-                  />
-                }
-                label={discount.label}
-              />
-            ))}
-          </AccordionDetails>
-        </Accordion>
-
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>Rating</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            {ratings.map((rating) => (
-              <FormControlLabel
-                key={rating}
-                control={
-                  <Checkbox
-                    checked={filters.rating === rating}
-                    onChange={() => handleFilterChange('rating', rating)}
-                  />
-                }
-                label={`${rating} Stars & Above`}
-              />
-            ))}
-          </AccordionDetails>
-        </Accordion>
-
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>Availability</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            {stockOptions.map((option) => (
-              <FormControlLabel
-                key={option.value}
-                control={
-                  <Checkbox
-                    checked={filters.stock === option.value}
-                    onChange={() => handleFilterChange('stock', option.value)}
-                  />
-                }
-                label={option.label}
-              />
-            ))}
-          </AccordionDetails>
-        </Accordion>
-
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>Special</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={filters.isNewArrival}
-                  onChange={(e) => handleFilterChange('isNewArrival', e.target.checked)}
-                />
-              }
-              label="New Arrivals"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={filters.isFeatured}
-                  onChange={(e) => handleFilterChange('isFeatured', e.target.checked)}
-                />
-              }
-              label="Featured Products"
-            />
-          </AccordionDetails>
-        </Accordion>
-
-        {availableFilters.colors.length > 0 && (
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography>Colors</Typography>
+        <Box 
+          sx={{ 
+            flexGrow: 1,
+            overflowY: 'auto',
+            pr: 1,
+            mr: -1,
+            '&::-webkit-scrollbar': {
+              width: '4px',
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: '#f5f5f5',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: '#ddd',
+              borderRadius: '4px',
+            },
+          }}
+        >
+          <FilterAccordion defaultExpanded>
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />}
+              sx={{ px: 1 }}
+            >
+              <Typography sx={{ fontWeight: 600 }}>Search</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {availableFilters.colors.map((color) => (
-                  <Chip
-                    key={color}
-                    label={color}
-                    onClick={() => handleFilterChange('colors', color)}
-                    onDelete={
-                      filters.colors.includes(color) 
-                        ? () => handleFilterChange('colors', color)
-                        : undefined
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search products..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                InputProps={{
+                  sx: { borderRadius: '4px' }
+                }}
+              />
+            </AccordionDetails>
+          </FilterAccordion>
+
+          <FilterAccordion defaultExpanded>
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />}
+              sx={{ px: 1 }}
+            >
+              <Typography sx={{ fontWeight: 600 }}>Price Range</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {priceRanges.map((range) => (
+                  <FormControlLabel
+                    key={range.value}
+                    control={
+                      <Checkbox
+                        checked={filters.priceRange === range.value}
+                        onChange={() => handleFilterChange('priceRange', range.value)}
+                        size="small"
+                      />
                     }
-                    color={filters.colors.includes(color) ? "primary" : "default"}
-                    sx={{ m: 0.5 }}
+                    label={
+                      <Typography variant="body2">{range.label}</Typography>
+                    }
+                    sx={{ ml: -1 }}
                   />
                 ))}
               </Box>
             </AccordionDetails>
-          </Accordion>
-        )}
+          </FilterAccordion>
 
-        {availableFilters.sizes.length > 0 && (
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography>Sizes</Typography>
+          {availableFilters.colors.length > 0 && (
+            <FilterAccordion>
+              <AccordionSummary 
+                expandIcon={<ExpandMoreIcon />}
+                sx={{ px: 1 }}
+              >
+                <Typography sx={{ fontWeight: 600 }}>Colors</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                  {availableFilters.colors.map((color) => (
+                    <ColorSwatch
+                      key={color}
+                      color={getColorCode(color)}
+                      selected={filters.colors.includes(color)}
+                      onClick={() => handleFilterChange('colors', color)}
+                      title={color}
+                    />
+                  ))}
+                </Box>
+              </AccordionDetails>
+            </FilterAccordion>
+          )}
+
+          {availableFilters.sizes.length > 0 && (
+            <FilterAccordion>
+              <AccordionSummary 
+                expandIcon={<ExpandMoreIcon />}
+                sx={{ px: 1 }}
+              >
+                <Typography sx={{ fontWeight: 600 }}>Sizes</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {availableFilters.sizes.map((size) => (
+                    <SizeBox
+                      key={size}
+                      selected={filters.sizes.includes(size)}
+                      onClick={() => handleFilterChange('sizes', size)}
+                    >
+                      {size}
+                    </SizeBox>
+                  ))}
+                </Box>
+              </AccordionDetails>
+            </FilterAccordion>
+          )}
+
+          <FilterAccordion>
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />}
+              sx={{ px: 1 }}
+            >
+              <Typography sx={{ fontWeight: 600 }}>Discount</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {availableFilters.sizes.map((size) => (
-                  <Chip
-                    key={size}
-                    label={size}
-                    onClick={() => handleFilterChange('sizes', size)}
-                    onDelete={
-                      filters.sizes.includes(size) 
-                        ? () => handleFilterChange('sizes', size)
-                        : undefined
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {discountRanges.map((discount) => (
+                  <FormControlLabel
+                    key={discount.value}
+                    control={
+                      <Checkbox
+                        checked={filters.minDiscount === discount.value}
+                        onChange={() => handleFilterChange('minDiscount', discount.value)}
+                        size="small"
+                      />
                     }
-                    color={filters.sizes.includes(size) ? "primary" : "default"}
-                    sx={{ m: 0.5 }}
+                    label={
+                      <Typography variant="body2">{discount.label}</Typography>
+                    }
+                    sx={{ ml: -1 }}
                   />
                 ))}
               </Box>
             </AccordionDetails>
-          </Accordion>
-        )}
+          </FilterAccordion>
+
+          <FilterAccordion>
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />}
+              sx={{ px: 1 }}
+            >
+              <Typography sx={{ fontWeight: 600 }}>Rating</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {ratings.map((rating) => (
+                  <FormControlLabel
+                    key={rating}
+                    control={
+                      <Checkbox
+                        checked={filters.rating === rating}
+                        onChange={() => handleFilterChange('rating', rating)}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {[...Array(rating)].map((_, i) => (
+                          <Box 
+                            key={i} 
+                            component="span" 
+                            sx={{ color: 'gold', fontSize: '18px' }}
+                          >
+                            ★
+                          </Box>
+                        ))}
+                        <Typography variant="body2">&nbsp;& Above</Typography>
+                      </Box>
+                    }
+                    sx={{ ml: -1 }}
+                  />
+                ))}
+              </Box>
+            </AccordionDetails>
+          </FilterAccordion>
+
+          <FilterAccordion>
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />}
+              sx={{ px: 1 }}
+            >
+              <Typography sx={{ fontWeight: 600 }}>Availability</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {stockOptions.map((option) => (
+                  <FormControlLabel
+                    key={option.value}
+                    control={
+                      <Checkbox
+                        checked={filters.stock === option.value}
+                        onChange={() => handleFilterChange('stock', option.value)}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">{option.label}</Typography>
+                    }
+                    sx={{ ml: -1 }}
+                  />
+                ))}
+              </Box>
+            </AccordionDetails>
+          </FilterAccordion>
+
+          <FilterAccordion>
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />}
+              sx={{ px: 1 }}
+            >
+              <Typography sx={{ fontWeight: 600 }}>Special</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={filters.isNewArrival}
+                      onChange={(e) => handleFilterChange('isNewArrival', e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2">New Arrivals</Typography>
+                  }
+                  sx={{ ml: -1 }}
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={filters.isFeatured}
+                      onChange={(e) => handleFilterChange('isFeatured', e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2">Featured Products</Typography>
+                  }
+                  sx={{ ml: -1 }}
+                />
+              </Box>
+            </AccordionDetails>
+          </FilterAccordion>
+        </Box>
+
+        <Box sx={{ pt: 2, mt: 1, borderTop: '1px solid #eee' }}>
+          <Button 
+            variant="contained" 
+            fullWidth
+            onClick={() => setIsFilterOpen(false)}
+            sx={{ 
+              py: 1.2,
+              textTransform: 'none',
+              fontSize: '1rem',
+              fontWeight: 600,
+              borderRadius: '4px',
+              backgroundColor: '#000000',
+              color: 'white',
+              '&:hover': {
+                backgroundColor: '#00503a',
+              }
+            }}
+          >
+            Apply Filters
+          </Button>
+        </Box>
       </Box>
     </Drawer>
   );
 
+  const ActiveFilters = () => {
+    // Check if any filters are active
+    const hasActiveFilters = Object.values(filters).some(filter => 
+      Array.isArray(filter) ? filter.length > 0 : filter !== '' && filter !== false
+    );
+
+    if (!hasActiveFilters) return null;
+
+    const getChipLabel = (key, value) => {
+      switch(key) {
+        case 'priceRange':
+          return priceRanges.find(range => range.value === value)?.label || value;
+        case 'minDiscount':
+          return `${value}% off or more`;
+        case 'rating':
+          return `${value}★ & Above`;
+        case 'stock':
+          return value === 'in_stock' ? 'In Stock' : 'Out of Stock';
+        case 'isNewArrival':
+          return 'New Arrivals';
+        case 'isFeatured':
+          return 'Featured';
+        default:
+          return value;
+      }
+    };
+
+    return (
+      <Box 
+        sx={{ 
+          mb: 3, 
+          p: 2,
+          backgroundColor: '#fafafa',
+          borderRadius: '6px',
+          border: '1px solid #eaeaea',
+        }}
+      >
+        <Box sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 1
+        }}>
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              fontWeight: 600, 
+              color: '#000',
+              mr: 1
+            }}
+          >
+            Active Filters
+          </Typography>
+          
+          <Button 
+            variant="text" 
+            size="small" 
+            onClick={handleClearFilters}
+            sx={{ 
+              color: '#000',
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              p: 0.5,
+              minWidth: 'auto'
+            }}
+          >
+            Clear All
+          </Button>
+        </Box>
+        
+        <Box sx={{
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 1,
+          alignItems: 'center'
+        }}>
+          {Object.entries(filters).map(([key, value]) => {
+            if (Array.isArray(value) && value.length > 0) {
+              return value.map(item => (
+                <FilterChip
+                  key={`${key}-${item}`}
+                  label={item}
+                  onDelete={() => handleFilterChange(key, item)}
+                  size="small"
+                />
+              ));
+            } else if (value && !Array.isArray(value) && value !== false) {
+              return (
+                <FilterChip
+                  key={key}
+                  label={getChipLabel(key, value)}
+                  onDelete={() => handleFilterChange(key, value === true ? false : '')}
+                  size="small"
+                />
+              );
+            }
+            return null;
+          })}
+        </Box>
+      </Box>
+    );
+  };
+
   if (customersProduct.loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
+      <Box sx={{ width: '100%', bgcolor: '#fff', ...mobileContainerStyle }}>
+        <Box sx={{ 
+          maxWidth: '100%', 
+          px: { xs: 2, md: 4 }, 
+          py: 4,
+          boxShadow: '0 0 10px rgba(0,0,0,0.03)'
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            mb: 3,
+            flexWrap: 'wrap',
+            gap: 2
+          }}>
+            <Skeleton variant="rectangular" width={100} height={40} sx={{ backgroundColor: '#69af5a', opacity: 0.2 }} />
+            <Skeleton variant="rectangular" width={200} height={40} sx={{ backgroundColor: '#69af5a', opacity: 0.2 }} />
+          </Box>
+          
+          <Grid container spacing={2}>
+            {Array.from(new Array(12)).map((_, index) => (
+              <Grid item xs={6} sm={6} md={3} key={index}>
+                <ProductSkeleton />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ width: '100%', bgcolor: '#fff' }}>
-      <Box sx={{ maxWidth: '100%', px: 2, py: 4 }}>
+    <Box sx={{ width: '100%', bgcolor: '#fff', ...mobileContainerStyle }}>
+      <Box sx={{ 
+        maxWidth: '100%', 
+        px: { xs: 2, md: 4 }, 
+        py: 4,
+        boxShadow: '0 0 10px rgba(0,0,0,0.03)'
+      }}>
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center', 
           mb: 3,
-          flexWrap: 'wrap',
-          gap: 2
+          flexDirection: { xs: 'row', sm: 'row' },
+          width: '100%',
+          gap: { xs: 1, sm: 2 }
         }}>
-          <FilterButton 
-            onClick={() => setIsFilterOpen(true)}
-            startIcon={<FilterListIcon />}
-          >
-            Filter
-          </FilterButton>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: { xs: 1, sm: 2 },
+            flex: { xs: '1', sm: 'auto' }
+          }}>
+            <FilterButton 
+              onClick={() => setIsFilterOpen(true)}
+              startIcon={<FilterListIcon />}
+              variant="contained"
+              size={isMobile ? "small" : "medium"}
+              sx={{
+                borderRadius: '4px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: { xs: 1, sm: 2 },
+                whiteSpace: 'nowrap',
+                minWidth: 'auto'
+              }}
+            >
+              Filter {Object.values(filters).some(f => Array.isArray(f) ? f.length > 0 : f !== '' && f !== false) && '•'}
+            </FilterButton>
+            
+            {customersProduct.products?.totalProducts > 0 && (
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: 'text.secondary', 
+                  fontWeight: 500,
+                  display: { xs: 'none', sm: 'block' }
+                }}
+              >
+                {customersProduct.products?.totalProducts} {customersProduct.products?.totalProducts === 1 ? 'Product' : 'Products'}
+              </Typography>
+            )}
+          </Box>
           
-          <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 200 }}>
+          <FormControl 
+            size="small" 
+            sx={{ 
+              width: { xs: '50%', sm: 'auto' }, 
+              minWidth: { xs: 'auto', sm: 200 },
+              flex: { xs: '1', sm: 'auto' }
+            }}
+          >
             <Select
               value={sortBy}
               onChange={handleSortChange}
               displayEmpty
               variant="outlined"
+              sx={{ 
+                borderRadius: '4px',
+                '& .MuiSelect-select': {
+                  paddingRight: { xs: '26px', sm: '32px' }
+                }
+              }}
             >
               <MenuItem value="">Sort By</MenuItem>
               <MenuItem value="price_low">Price: Low to High</MenuItem>
               <MenuItem value="price_high">Price: High to Low</MenuItem>
               <MenuItem value="newest">Newest First</MenuItem>
+              <MenuItem value="popularity">Popularity</MenuItem>
             </Select>
           </FormControl>
         </Box>
 
-        {Object.values(filters).some(filter => 
-          Array.isArray(filter) ? filter.length > 0 : filter !== ''
-        ) && (
-          <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {Object.entries(filters).map(([key, value]) => {
-              if (Array.isArray(value) && value.length > 0) {
-                return value.map(item => (
-                  <Chip
-                    key={`${key}-${item}`}
-                    label={item}
-                    onDelete={() => handleFilterChange(key, item)}
-                    size="small"
-                  />
-                ));
-              } else if (value && !Array.isArray(value)) {
-                return (
-                  <Chip
-                    key={key}
-                    label={priceRanges.find(range => range.value === value)?.label || value}
-                    onDelete={() => handleFilterChange(key, value)}
-                    size="small"
-                  />
-                );
-              }
-              return null;
-            })}
-          </Box>
-        )}
+        <ActiveFilters />
 
         <FilterDrawer />
+
+        {customersProduct.products?.totalProducts > 0 && (
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              color: 'text.secondary', 
+              fontWeight: 500,
+              display: { xs: 'block', sm: 'none' },
+              mb: 2
+            }}
+          >
+            {customersProduct.products?.totalProducts} {customersProduct.products?.totalProducts === 1 ? 'Product' : 'Products'}
+          </Typography>
+        )}
 
         {customersProduct.error ? (
           <Alert severity="error" sx={{ mb: 4 }}>
@@ -665,87 +1284,23 @@ const Product = () => {
         ) : (
           <>
             <Grid container spacing={2}>
-              {customersProduct.products?.content?.map((product) => {
-                const primaryImage = product.colors?.[0]?.images?.[0];
-                const secondaryImage = product.colors?.[0]?.images?.[1] || primaryImage;
-                
-                return (
-                  <Grid item xs={12} sm={6} md={3} key={product._id}>
-                    <ProductCard onClick={() => handleProductClick(product._id)}>
-                      <ImageContainer>
-                        <ProductImage
-                          className="primary-image"
-                          src={primaryImage ? getImageUrl(primaryImage) : 'https://via.placeholder.com/400x600'}
-                          alt={product.title}
-                          onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/400x600';
-                          }}
-                        />
-                        <ProductImage
-                          className="secondary-image"
-                          src={secondaryImage ? getImageUrl(secondaryImage) : 'https://via.placeholder.com/400x600'}
-                          alt={`${product.title} - hover`}
-                          onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/400x600';
-                          }}
-                          sx={{ opacity: 0 }}
-                        />
-                      </ImageContainer>
-                      
-                      <CardContent>
-                        <Typography 
-                          variant="h6" 
-                          sx={{ 
-                            fontSize: '0.9rem',
-                            fontWeight: 500,
-                            mb: 1,
-                            color: '#000'
-                          }}
-                        >
-                          {product.title}
-                        </Typography>
-                        
-                        <PriceContainer>
-                          <Typography 
-                            variant="h6" 
-                            sx={{ 
-                              fontSize: '0.9rem',
-                              fontWeight: 500,
-                              color: '#000'
-                            }}
-                          >
-                            Tk. {product.discountedPrice || product.price}
-                          </Typography>
-                          
-                          {product.discountedPrice && product.discountedPrice < product.price && (
-                            <>
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
-                                  textDecoration: 'line-through',
-                                  color: '#666',
-                                  fontSize: '0.9rem'
-                                }}
-                              >
-                                Tk. {product.price}
-                              </Typography>
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
-                                  color: '#666',
-                                  fontSize: '0.9rem'
-                                }}
-                              >
-                                ({product.discountPersent}% OFF)
-                              </Typography>
-                            </>
-                          )}
-                        </PriceContainer>
-                      </CardContent>
-                    </ProductCard>
-                  </Grid>
-                );
-              })}
+              {customersProduct.products?.content?.map((product) => (
+                <Grid 
+                  item 
+                  xs={6} 
+                  sm={6} 
+                  md={3} 
+                  key={product._id} 
+                  sx={{ 
+                    ...(isMobile ? { height: '45vh' } : {})
+                  }}
+                >
+                  <ProductCardWithLoader 
+                    product={product} 
+                    onClick={() => handleProductClick(product._id, product)} 
+                  />
+                </Grid>
+              ))}
             </Grid>
 
             {customersProduct.products?.totalPages > 1 && (

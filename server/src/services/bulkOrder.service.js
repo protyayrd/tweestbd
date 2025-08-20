@@ -2,6 +2,7 @@ const BulkOrder = require('../models/bulkOrder.model.js');
 const Product = require('../models/product.model.js');
 const User = require('../models/user.model.js');
 const Address = require('../models/address.model.js');
+const { generateOrderId } = require('../utils/orderIdGenerator.js');
 
 async function createBulkOrder(user, orderData) {
   try {
@@ -37,8 +38,9 @@ async function createBulkOrder(user, orderData) {
 
       processedItems.push({
         product: product._id,
-        quantity: item.quantity,
         size: item.size,
+        color: item.color,
+        quantity: item.quantity,
         price: itemPrice,
         discountedPrice: itemDiscountedPrice
       });
@@ -52,19 +54,25 @@ async function createBulkOrder(user, orderData) {
     const expectedDeliveryDate = new Date();
     expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + 7);
 
+    // Generate a formatted order ID
+    const formattedOrderId = await generateOrderId();
+    console.log("Generated formatted order ID for bulk order:", formattedOrderId);
+    
+    // Generate a clean transaction ID
+    const transactionId = `BULK-${formattedOrderId}`;
+    
     const bulkOrder = new BulkOrder({
       user: user._id,
+      formattedOrderId,
+      transactionId,
       orderItems: processedItems,
       shippingAddress: address._id,
       expectedDeliveryDate,
-      paymentDetails: {
-        paymentMethod: orderData.paymentMethod,
-        paymentStatus: 'PENDING'
-      },
+      paymentMethod: orderData.paymentMethod,
       totalPrice,
       totalDiscountedPrice,
       discount: totalPrice - totalDiscountedPrice,
-      totalItems,
+      totalItem: totalItems,
       notes: orderData.notes,
       orderStatus: 'PLACED'
     });
@@ -76,7 +84,7 @@ async function createBulkOrder(user, orderData) {
       .populate('user', 'firstName lastName email')
       .populate({
         path: 'orderItems.product',
-        select: 'title price discountedPrice imageUrl'
+        select: 'title price discountedPrice imageUrl brand category'
       })
       .populate('shippingAddress');
   } catch (error) {
@@ -111,6 +119,23 @@ async function getBulkOrderById(orderId) {
 
   if (!order) {
     throw new Error('Bulk order not found');
+  }
+
+  return order;
+}
+
+async function getBulkOrderByFormattedId(formattedOrderId) {
+  const order = await BulkOrder.findOne({ formattedOrderId })
+    .populate('user', 'firstName lastName email')
+    .populate({
+      path: 'orderItems.product',
+      select: 'title price discountedPrice imageUrl brand category'
+    })
+    .populate('shippingAddress')
+    .lean();
+
+  if (!order) {
+    throw new Error('Bulk order not found with formatted ID: ' + formattedOrderId);
   }
 
   return order;
@@ -168,6 +193,7 @@ module.exports = {
   createBulkOrder,
   updateBulkOrderStatus,
   getBulkOrderById,
+  getBulkOrderByFormattedId,
   getAllBulkOrders,
   getUserBulkOrders,
   deleteBulkOrder

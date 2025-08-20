@@ -306,6 +306,17 @@ async function findProductById(req, res) {
   }
 }
 
+// Find a product by slug
+async function findProductBySlug(req, res) {
+  try {
+    const slug = req.params.slug;
+    const product = await productService.findProductBySlug(slug);
+    return res.status(200).send(product);
+  } catch (err) {
+    return res.status(404).json({ message: err.message });
+  }
+}
+
 // Find products by category
 async function findProductByCategory(req, res) {
   try {
@@ -320,11 +331,29 @@ async function findProductByCategory(req, res) {
 // Search products by query
 async function searchProduct(req, res) {
   try {
-    const query = req.params.query;
+    // Check if query is in params or query string
+    const query = req.params.query || req.query.q;
+    
+    if (!query) {
+      return res.status(400).json({ 
+        error: 'Missing search query',
+        message: 'Please provide a search query parameter'
+      });
+    }
+
+    // Use findProducts service with search functionality
     const products = await productService.searchProduct(query);
-    res.json(products);
+    
+    return res.status(200).json({ 
+      success: true,
+      products
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in product search:', err);
+    return res.status(500).json({ 
+      error: err.message,
+      success: false
+    });
   }
 }
 
@@ -357,6 +386,7 @@ module.exports = {
   updateProduct,
   getAllProducts,
   findProductById,
+  findProductBySlug,
   findProductByCategory,
   searchProduct,
   createMultipleProduct

@@ -63,6 +63,10 @@ async function createProduct(reqData) {
     const product = new Product({
       title: reqData.title,
       description: reqData.description,
+      features: reqData.features || '',
+      perfectFor: reqData.perfectFor || '',
+      additionalInfo: reqData.additionalInfo || '',
+      sku: reqData.sku || '',
       discountedPrice: Number(reqData.discountedPrice),
       discountPersent: Number(reqData.discountPersent),
       colors: colors,
@@ -119,15 +123,25 @@ async function findProductById(id) {
   return product;
 }
 
+// Find a product by slug
+async function findProductBySlug(slug) {
+  const product = await Product.findOne({ slug }).populate("category").exec();
+
+  if (!product) {
+    throw new Error("Product not found with slug " + slug);
+  }
+  return product;
+}
+
 // Get all products with filtering and pagination
 async function getAllProducts(reqQuery) {
   try {
-    // Ensure valid pagination parameters
+    // Ensure valid pagination parameters (1-based pageNumber)
     let pageSize = Math.max(1, parseInt(reqQuery.pageSize) || 10);
-    let pageNumber = Math.max(0, parseInt(reqQuery.pageNumber) || 1);
+    let pageNumber = Math.max(1, parseInt(reqQuery.pageNumber) || 1);
     
-    // Calculate skip value, ensuring it's non-negative
-    let skip = Math.max(0, pageNumber * pageSize);
+    // Calculate skip value for 1-based page numbers
+    let skip = (pageNumber - 1) * pageSize;
     
     console.log('Pagination params:', { pageSize, pageNumber, skip });
 
@@ -144,6 +158,11 @@ async function getAllProducts(reqQuery) {
 
     if (reqQuery.sizes) {
       query = query.where("sizes").in(reqQuery.sizes);
+    }
+
+    if (typeof reqQuery.isNewArrival !== 'undefined') {
+      const isNew = (reqQuery.isNewArrival === true) || (reqQuery.isNewArrival === 'true') || (reqQuery.isNewArrival === '1');
+      query = query.where('isNewArrival').equals(isNew);
     }
 
     if (reqQuery.minPrice && reqQuery.maxPrice) {
@@ -164,10 +183,13 @@ async function getAllProducts(reqQuery) {
     // Calculate total pages
     const totalPages = Math.ceil(totalProducts / pageSize);
     
-    // Adjust pageNumber if it exceeds totalPages
-    if (totalPages > 0 && pageNumber >= totalPages) {
-      pageNumber = totalPages - 1;
-      skip = pageNumber * pageSize;
+    // Adjust pageNumber if it exceeds totalPages (keep 1-based)
+    if (totalPages === 0) {
+      pageNumber = 1;
+      skip = 0;
+    } else if (pageNumber > totalPages) {
+      pageNumber = totalPages;
+      skip = (pageNumber - 1) * pageSize;
     }
 
     // Apply sorting
@@ -317,12 +339,38 @@ async function findProducts(reqData) {
   };
 }
 
+// Update product ratings when reviews change
+async function updateProductRating(productId, avgRating, numRatings) {
+  try {
+    const product = await Product.findById(productId);
+    
+    if (!product) {
+      throw new Error(`Product not found with id ${productId}`);
+    }
+    
+    // Update with the average rating value (a number, not an array)
+    product.ratings = avgRating;
+    product.numRatings = numRatings;
+    
+    // We don't need to modify the reviews array here, as it's managed separately
+    
+    await product.save();
+    
+    return product;
+  } catch (error) {
+    console.error("Error updating product ratings:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   createProduct,
   deleteProduct,
   updateProduct,
   getAllProducts,
   findProductById,
+  findProductBySlug,
   createMultipleProduct,
   findProducts,
+  updateProductRating,
 };

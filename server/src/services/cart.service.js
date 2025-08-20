@@ -1,6 +1,8 @@
 const Cart = require("../models/cart.model.js");
 const CartItem = require("../models/cartItem.model.js");
 const Product = require("../models/product.model.js");
+const comboOfferService = require("../services/comboOffer.service.js");
+const mongoose = require('mongoose');
 
 // Create a new cart for a user
 async function createCart(userId) {
@@ -9,6 +11,15 @@ async function createCart(userId) {
             throw new Error("User ID is required");
         }
 
+        console.log("Checking for existing cart for user:", userId);
+        
+        // First check if cart already exists
+        const existingCart = await Cart.findOne({ user: userId });
+        if (existingCart) {
+            console.log("Cart already exists for user:", userId);
+            return existingCart;
+        }
+        
         console.log("Creating new cart for user:", userId);
         
         // Create a new cart with properly initialized promoDetails
@@ -43,121 +54,228 @@ async function createCart(userId) {
 // Find a user's cart and update cart details
 async function findUserCart(userId) {
     try {
-        if (!userId) {
-            throw new Error("User ID is required");
-        }
-
-        let cart = await Cart.findOne({ user: userId });
-        if (!cart) {
-            cart = await createCart(userId);
-        }
-
-        await cart.populate([
-            {
+        const cart = await Cart.findOne({ user: userId })
+            .populate({
                 path: 'cartItems',
                 populate: {
                     path: 'product',
-                    select: '_id title price discountedPrice discountPersent colors'
+                    model: 'products',
+                    select: 'title price discountedPrice discountPersent colors description imageUrl category',
+                    populate: {
+                        path: 'category',
+                        model: 'categories',
+                        select: 'name _id level parentCategory'
+                    }
                 }
-            },
-            {
-                path: 'promoCode',
-                select: '_id code discountType discountAmount maxDiscountAmount'
-            }
-        ]);
+            })
+            .populate('promoCode')
+            .lean();
 
-        // Calculate total base price after product discounts
-        const totalBaseDiscountedPrice = cart.cartItems.reduce((total, item) => {
-            const baseDiscountedPrice = item.product.discountedPrice || item.product.price;
-            return total + (baseDiscountedPrice * item.quantity);
-        }, 0);
-
-        // Get promo code details and calculate total promo discount
-        let promoDetails = null;
-        let totalPromoDiscount = 0;
-
-        if (cart.promoCode) {
-            promoDetails = {
-                code: cart.promoCode.code,
-                discountType: cart.promoCode.discountType,
-                discountAmount: cart.promoCode.discountAmount,
-                maxDiscountAmount: cart.promoCode.maxDiscountAmount
+        if (!cart) {
+            console.log('Cart not found for user:', userId, 'Creating a new cart');
+            await createCart(userId);
+            
+            // Return empty cart structure
+            return {
+                cartItems: [],
+                totalPrice: 0,
+                totalDiscountedPrice: 0,
+                discount: 0,
+                totalItem: 0,
+                promoCodeDiscount: 0,
+                promoDetails: {
+                    code: undefined,
+                    discountType: 'FIXED',
+                    discountAmount: 0,
+                    maxDiscountAmount: undefined
+                }
             };
-
-            // Calculate total promo discount
-            if (cart.promoCode.discountType === 'PERCENTAGE') {
-                totalPromoDiscount = (totalBaseDiscountedPrice * cart.promoCode.discountAmount) / 100;
-                if (cart.promoCode.maxDiscountAmount) {
-                    totalPromoDiscount = Math.min(totalPromoDiscount, cart.promoCode.maxDiscountAmount);
-                }
-            } else {
-                totalPromoDiscount = cart.promoCode.discountAmount;
-            }
-
-            // Ensure promo discount doesn't exceed total price
-            totalPromoDiscount = Math.min(totalPromoDiscount, totalBaseDiscountedPrice);
         }
 
-        // Calculate cart items with promo distribution
-        const cartItems = await Promise.all(cart.cartItems.map(async (item) => {
-            const cartItem = item.toObject();
+        // Get all product IDs from cart items
+        const productIds = cart.cartItems.map(item => item.product._id);
+
+        // Fetch complete product data for all products in cart
+        const products = await Product.find({ _id: { $in: productIds } })
+            .populate('category', 'name _id level parentCategory')
+            .lean();
+
+        // Create a map of product data by ID
+        const productMap = products.reduce((map, product) => {
+            map[product._id.toString()] = product;
+            return map;
+        }, {});
+
+        let totalOriginalPrice = 0;
+        let totalBaseDiscountedPrice = 0;
+        let totalPromoDiscount = 0;
+        let promoDetails = null;
+
+        // Calculate base totals first
+        cart.cartItems.forEach(item => {
+            const originalPrice = item.product.price || 0;
+            const baseDiscountedPrice = item.product.discountedPrice || originalPrice;
+            const quantity = item.quantity || 0;
+
+            totalOriginalPrice += originalPrice * quantity;
+            totalBaseDiscountedPrice += baseDiscountedPrice * quantity;
+        });
+
+        // Handle promo code if exists and is valid
+        if (cart.promoCode) {
+            const now = new Date();
+            const isValid = cart.promoCode.isActive && 
+                          cart.promoCode.validFrom <= now && 
+                          cart.promoCode.validUntil >= now &&
+                          (cart.promoCode.usageLimit === null || cart.promoCode.usageCount < cart.promoCode.usageLimit);
+
+            if (isValid && totalBaseDiscountedPrice >= (cart.promoCode.minOrderAmount || 0)) {
+                promoDetails = {
+                    code: cart.promoCode.code,
+                    discountType: cart.promoCode.discountType,
+                    discountAmount: cart.promoCode.discountAmount,
+                    maxDiscountAmount: cart.promoCode.maxDiscountAmount
+                };
+
+                // Calculate promo discount
+                if (cart.promoCode.discountType === 'PERCENTAGE') {
+                    totalPromoDiscount = (totalBaseDiscountedPrice * cart.promoCode.discountAmount) / 100;
+                    if (cart.promoCode.maxDiscountAmount) {
+                        totalPromoDiscount = Math.min(totalPromoDiscount, cart.promoCode.maxDiscountAmount);
+                    }
+                } else {
+                    totalPromoDiscount = Math.min(cart.promoCode.discountAmount, totalBaseDiscountedPrice);
+                }
+            } else {
+                // If promo code is invalid, remove it from cart
+                await Cart.findByIdAndUpdate(cart._id, {
+                    $unset: { promoCode: 1 },
+                    promoCodeDiscount: 0,
+                    promoDetails: null
+                });
+            }
+        }
+
+        // Calculate final totals
+        const productDiscount = totalOriginalPrice - totalBaseDiscountedPrice;
+
+        // Apply combo offers
+        let comboOfferDiscount = 0;
+        let appliedComboOffers = [];
+        let finalCartItems = [];
+
+        try {
+            // Ensure all cart items have properly populated product data with categories
+            const cartItemsWithCategories = cart.cartItems.map(item => ({
+                ...item,
+                product: {
+                    ...item.product,
+                    category: productMap[item.product._id.toString()]?.category || item.product.category
+                }
+            }));
             
-            const selectedColor = cartItem.product.colors.find(c => c.name === cartItem.color);
-            const firstColor = cartItem.product.colors[0];
+            console.log('🔍 [Backend Cart Service] Cart items with categories for combo offers:', cartItemsWithCategories.map(item => ({
+                productId: item.product._id,
+                categoryId: item.product.category?._id,
+                categoryName: item.product.category?.name,
+                hasCategory: !!item.product.category
+            })));
             
-            let imageUrl = selectedColor?.images?.[0] || firstColor?.images?.[0] || null;
+            const comboResult = await comboOfferService.applyComboOffersToCart(cartItemsWithCategories);
+            
+            comboOfferDiscount = comboResult.totalComboDiscount;
+            appliedComboOffers = comboResult.appliedOffers;
+            finalCartItems = comboResult.updatedCartItems || comboResult.items || cartItemsWithCategories;
+            
+            console.log('Combo offers applied. Discount:', comboOfferDiscount, 'Applied offers:', appliedComboOffers.length);
+        } catch (error) {
+            console.error('Error applying combo offers:', error);
+            // If combo offer fails, continue with original items but ensure they have categories
+            finalCartItems = cart.cartItems.map(item => ({
+                ...item,
+                product: {
+                    ...item.product,
+                    category: productMap[item.product._id.toString()]?.category || item.product.category
+                }
+            }));
+        }
 
-            // Calculate base prices
-            const originalPrice = cartItem.product.price || 0;
-            const baseDiscountedPrice = cartItem.product.discountedPrice || originalPrice;
-            const quantity = cartItem.quantity || 0;
-            const itemBaseTotal = baseDiscountedPrice * quantity;
+        // Calculate final total after all discounts
+        const afterComboTotal = Math.max(totalBaseDiscountedPrice - comboOfferDiscount, 0);
+        const finalTotal = Math.max(afterComboTotal - totalPromoDiscount, 0);
 
-            // Calculate this item's share of promo discount
-            const promoDiscountRatio = totalBaseDiscountedPrice > 0 ? 
-                (itemBaseTotal / totalBaseDiscountedPrice) : 0;
-            const itemPromoDiscount = totalPromoDiscount * promoDiscountRatio;
+        // Transform cart items with all discount distributions
+        const cartItems = await Promise.all(finalCartItems.map(async (item) => {
+            const cartItem = item;
+            const originalPrice = item.product.price || 0;
+            const baseDiscountedPrice = item.product.discountedPrice || originalPrice;
+            const quantity = item.quantity || 0;
+            
+            // Get combo pricing if available
+            const comboPrice = item.comboPrice || baseDiscountedPrice;
+            const comboDiscount = item.comboDiscount || 0;
+            const itemComboTotal = comboPrice * quantity;
+            
+            // Calculate item's share of promo discount based on post-combo price
+            const itemPromoDiscount = totalPromoDiscount > 0 && afterComboTotal > 0
+                ? (itemComboTotal / afterComboTotal) * totalPromoDiscount 
+                : 0;
 
-            // Calculate all price components
-            const totalOriginalPrice = originalPrice * quantity;
-            const itemTotalBaseDiscountedPrice = baseDiscountedPrice * quantity;
-            const productDiscount = totalOriginalPrice - itemTotalBaseDiscountedPrice;
-            const finalDiscountedPrice = Math.max(itemTotalBaseDiscountedPrice - itemPromoDiscount, 0);
+            const productDiscount = (originalPrice - baseDiscountedPrice) * quantity;
+            const finalDiscountedPrice = itemComboTotal - itemPromoDiscount;
+
+            // Get complete product data from the map
+            const completeProduct = productMap[item.product._id.toString()];
+
+            // Find the selected color's images
+            let selectedColorImages = [];
+            if (completeProduct?.colors && Array.isArray(completeProduct.colors)) {
+                const selectedColor = completeProduct.colors.find(c => c && c.name === item.color);
+                if (selectedColor && selectedColor.images) {
+                    selectedColorImages = selectedColor.images;
+                }
+            }
 
             return {
                 ...cartItem,
                 cart: {
-                    promoCodeDiscount: totalPromoDiscount || 0,
-                    promoDetails: promoDetails || null
+                    promoCodeDiscount: itemPromoDiscount,
+                    comboOfferDiscount: comboDiscount,
+                    appliedComboOffers,
+                    promoDetails
                 },
                 product: {
-                    ...cartItem.product,
-                    imageUrl,
-                    price: originalPrice,
-                    discountedPrice: baseDiscountedPrice,
-                    discountPersent: cartItem.product.discountPersent || 
-                        Math.round((productDiscount / totalOriginalPrice) * 100)
+                    ...completeProduct,
+                    colors: completeProduct?.colors || [],
+                    selectedColorImages: selectedColorImages,
+                    imageUrl: completeProduct?.imageUrl,
+                    category: completeProduct?.category || item.product?.category
                 },
-                color: cartItem.color,
                 quantity,
-                totalPrice: totalOriginalPrice,
+                totalPrice: originalPrice * quantity,
                 totalDiscountedPrice: finalDiscountedPrice,
                 productDiscount,
+                comboDiscount,
                 promoDiscount: itemPromoDiscount,
-                totalDiscount: productDiscount + itemPromoDiscount
+                totalDiscount: productDiscount + comboDiscount + itemPromoDiscount,
+                hasComboOffer: item.hasComboOffer || false,
+                comboOfferName: item.comboOfferName || null,
+                originalUnitPrice: originalPrice,
+                comboUnitPrice: comboPrice
             };
         }));
 
-        // Return cart with all calculated values
         return {
             cartItems,
-            totalPrice: cart.totalPrice,
-            totalDiscountedPrice: cart.totalDiscountedPrice,
-            discount: cart.discount,
-            totalItem: cart.totalItem,
-            promoCode: cart.promoCode || null,
-            promoCodeDiscount: totalPromoDiscount || 0,
-            promoDetails: promoDetails || null
+            totalPrice: totalOriginalPrice,
+            totalDiscountedPrice: finalTotal,
+            discount: productDiscount + comboOfferDiscount + totalPromoDiscount,
+            totalItem: cart.cartItems.length,
+            promoCode: cart.promoCode,
+            promoCodeDiscount: totalPromoDiscount,
+            comboOfferDiscount,
+            appliedComboOffers,
+            promoDetails
         };
     } catch (error) {
         console.error("Error finding/updating cart:", error);
@@ -208,10 +326,16 @@ async function addCartItem(userId, cartItemData) {
         console.log("Found product:", product._id);
 
         // Validate that the color exists in the product's colors
-        const validColor = product.colors.some(c => c.name === cartItemData.color);
+        // Make sure product.colors exists and is an array before calling .some()
+        if (!product.colors || !Array.isArray(product.colors)) {
+            console.error("Product has no colors defined:", product._id);
+            throw new Error("Product has no colors defined");
+        }
+        
+        const validColor = product.colors.some(c => c && c.name === cartItemData.color);
         if (!validColor) {
-            console.error("Invalid color. Available colors:", product.colors.map(c => c.name));
-            throw new Error(`Invalid color. Available colors: ${product.colors.map(c => c.name).join(', ')}`);
+            console.error("Invalid color. Available colors:", product.colors.map(c => c && c.name).filter(Boolean));
+            throw new Error(`Invalid color. Available colors: ${product.colors.map(c => c && c.name).filter(Boolean).join(', ')}`);
         }
         console.log("Color validation passed:", cartItemData.color);
 
@@ -466,10 +590,135 @@ async function updateCartItem(userId, cartItemId, data) {
     }
 }
 
+// Clear all items from a user's cart
+async function clearCart(userId) {
+    try {
+        if (!userId) {
+            throw new Error("User ID is required");
+        }
+
+        console.log("Clearing cart for user:", userId);
+        
+        // Find existing cart
+        const existingCart = await Cart.findOne({ user: userId });
+        if (!existingCart) {
+            // If no cart exists, just create and return a new one
+            return await createCart(userId);
+        }
+
+        // Get all cart item IDs from old cart
+        const cartItemIds = existingCart.cartItems;
+
+        // Delete all cart items from old cart
+        if (cartItemIds.length > 0) {
+            await CartItem.deleteMany({ _id: { $in: cartItemIds } });
+            console.log("Deleted cart items:", cartItemIds);
+        }
+
+        // Delete the old cart
+        await Cart.findByIdAndDelete(existingCart._id);
+        console.log("Deleted old cart:", existingCart._id);
+
+        // Create a new cart
+        const newCart = await createCart(userId);
+        console.log("Created new cart:", newCart._id);
+        
+        return newCart;
+    } catch (error) {
+        console.error("Error clearing cart:", error);
+        throw new Error("Failed to clear cart: " + error.message);
+    }
+}
+
+// Delete all cart items for a user
+async function deleteCartItems(userId) {
+    try {
+        if (!userId) {
+            throw new Error("User ID is required");
+        }
+
+        console.log("Deleting cart items for user:", userId);
+        
+        // Find existing cart
+        const existingCart = await Cart.findOne({ user: userId });
+        if (!existingCart) {
+            console.log("No cart found for user:", userId);
+            return { message: "No cart found" };
+        }
+
+        // Get all cart item IDs from cart
+        const cartItemIds = existingCart.cartItems;
+
+        // Delete all cart items
+        if (cartItemIds && cartItemIds.length > 0) {
+            const result = await CartItem.deleteMany({ _id: { $in: cartItemIds } });
+            console.log(`Deleted ${result.deletedCount} cart items`);
+            
+            // Update cart to clear cartItems array
+            existingCart.cartItems = [];
+            await existingCart.save();
+            
+            return { message: `Deleted ${result.deletedCount} cart items` };
+        } else {
+            console.log("No cart items to delete");
+            return { message: "No cart items to delete" };
+        }
+    } catch (error) {
+        console.error("Error deleting cart items:", error);
+        throw new Error("Failed to delete cart items: " + error.message);
+    }
+}
+
+// Reset cart values for a user
+async function resetCart(userId) {
+    try {
+        if (!userId) {
+            throw new Error("User ID is required");
+        }
+
+        console.log("Resetting cart for user:", userId);
+        
+        // Find existing cart
+        const existingCart = await Cart.findOne({ user: userId });
+        if (!existingCart) {
+            console.log("No cart found for user:", userId);
+            return await createCart(userId);
+        }
+
+        // Reset all cart values
+        existingCart.totalPrice = 0;
+        existingCart.totalDiscountedPrice = 0;
+        existingCart.discount = 0;
+        existingCart.totalItem = 0;
+        existingCart.promoCodeDiscount = 0;
+        existingCart.promoCode = null;
+        
+        // Reset promoDetails
+        existingCart.set('promoDetails', {
+            code: undefined,
+            discountType: 'FIXED',
+            discountAmount: 0,
+            maxDiscountAmount: undefined
+        });
+        
+        // Save cart with validation disabled to avoid enum validation errors
+        const updatedCart = await existingCart.save({ validateBeforeSave: false });
+        console.log("Reset cart:", updatedCart);
+        
+        return updatedCart;
+    } catch (error) {
+        console.error("Error resetting cart:", error);
+        throw new Error("Failed to reset cart: " + error.message);
+    }
+}
+
 module.exports = {
     createCart,
     findUserCart,
     addCartItem,
     removeCartItem,
-    updateCartItem
+    updateCartItem,
+    clearCart,
+    deleteCartItems,
+    resetCart
 };

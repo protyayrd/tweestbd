@@ -53,12 +53,9 @@ const CategoryManagement = () => {
   // Add debug logs for categories
   useEffect(() => {
     if (categories?.length > 0) {
-      console.log('Categories in Admin:', categories);
-      console.log('Sample Category:', categories[0]);
-      console.log('Sample Image URL:', categories[0]?.imageUrl);
-      console.log('Full Image URL:', categories[0]?.imageUrl ? 
+      console.log('First category image URL:', 
         `${process.env.REACT_APP_API_URL}${categories[0].imageUrl.startsWith('/') ? '' : '/'}${categories[0].imageUrl}` 
-        : '/placeholder.png'
+        || '/placeholder.png'
       );
     }
   }, [categories]);

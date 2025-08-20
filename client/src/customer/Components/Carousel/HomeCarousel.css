@@ -1,0 +1,165 @@
+.alice-carousel {
+  /* Optimize GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000;
+  will-change: transform;
+}
+
+.alice-carousel__stage {
+  /* Prevent layout shifts */
+  contain: content;
+  /* Optimize GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  height: 100vh !important;
+}
+
+.alice-carousel__stage-item {
+  /* Prevent layout shifts */
+  contain: content;
+  height: 100vh !important;
+  /* Optimize transitions */
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Optimize animations */
+@media (prefers-reduced-motion: reduce) {
+  .alice-carousel__stage-item {
+    transition: none;
+  }
+}
+
+/* Optimize for high-end devices */
+@media (min-width: 1200px) {
+  .alice-carousel__stage-item {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Optimize for low-end devices */
+@media (max-width: 768px) {
+  .alice-carousel__stage {
+    height: 85vh !important;
+  }
+  
+  .alice-carousel__stage-item {
+    height: 85vh !important;
+    transition-duration: 0.6s;
+    transition-timing-function: ease-out;
+  }
+}
+
+/* Prevent image stretching during transitions */
+.alice-carousel__stage-item img {
+  object-fit: cover;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+.alice-carousel__dots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.alice-carousel__dots-item {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 6px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.alice-carousel__dots-item:hover {
+  background-color: rgba(255, 255, 255, 0.8);
+  transform: scale(1.2);
+}
+
+.alice-carousel__dots-item.__active {
+  width: 24px;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.nav-button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  opacity: 0.8;
+}
+
+.nav-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.8);
+  opacity: 1;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.nav-button.prev {
+  left: 20px;
+}
+
+.nav-button.next {
+  right: 20px;
+}
+
+/* Hide default Alice Carousel buttons */
+.alice-carousel__prev-btn,
+.alice-carousel__next-btn {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .nav-button {
+    width: 40px;
+    height: 40px;
+    opacity: 0.8;
+  }
+
+  .nav-button.prev {
+    left: 10px;
+  }
+
+  .nav-button.next {
+    right: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .nav-button.prev {
+    left: 10px;
+  }
+
+  .nav-button.next {
+    right: 10px;
+  }
+} 

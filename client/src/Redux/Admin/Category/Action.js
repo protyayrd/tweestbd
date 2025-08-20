@@ -49,15 +49,17 @@ export const getCategories = () => async (dispatch) => {
     dispatch({ type: GET_CATEGORIES_REQUEST });
 
     const response = await api.get('/api/categories');
-    console.log('Categories API Response:', response);
 
     if (!response.data) {
       throw new Error('No data received from categories API');
     }
 
+    // Ensure we're passing an array to the reducer
+    const categories = Array.isArray(response.data) ? response.data : [];
+
     dispatch({
       type: GET_CATEGORIES_SUCCESS,
-      payload: response.data,
+      payload: categories,
     });
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -84,7 +86,6 @@ export const updateCategory = ({ categoryId, data, jwt }) => async (dispatch) =>
       }
     });
 
-    console.log('Category update response:', response.data);
 
     dispatch({
       type: UPDATE_CATEGORY_SUCCESS,

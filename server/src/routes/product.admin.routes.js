@@ -4,9 +4,11 @@ const productController=require("../controllers/product.controller.js");
 const authenticate = require("../middleware/authenticate.js");
 const isAdmin = require("../middleware/isAdmin.js");
 
+router.get('/', authenticate, isAdmin, productController.getAllProducts);
 router.post('/', authenticate, isAdmin, productController.createProduct);
 router.post('/creates', authenticate, isAdmin, productController.createMultipleProduct);
 router.delete('/:id', authenticate, isAdmin, productController.deleteProduct);
 router.put('/:id', authenticate, isAdmin, productController.updateProduct);
+router.get('/search', authenticate, isAdmin, productController.searchProduct);
 
 module.exports=router;

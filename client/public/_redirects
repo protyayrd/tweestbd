@@ -1,0 +1,2 @@
+# Legacy product URL redirects
+/p/:slug   /product/:slug   301! 

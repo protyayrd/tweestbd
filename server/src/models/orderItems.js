@@ -8,7 +8,13 @@ const orderItemSchema = new Schema({
     ref: 'products',
     required: true,
   },
+  sku: {
+    type: String,
+  },
   size: {
+    type: String,
+  },
+  color: {
     type: String,
   },
   quantity: {
@@ -26,7 +32,7 @@ const orderItemSchema = new Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'users',
-    required: true,
+    required: false,
   },
   deliveryDate: {
     type: Date,

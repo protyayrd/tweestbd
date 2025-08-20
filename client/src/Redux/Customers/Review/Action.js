@@ -8,28 +8,24 @@ import {
     GET_ALL_RATINGS_SUCCESS,
     GET_ALL_RATINGS_FAILURE
   } from './ActionTyp';
-import api, { API_BASE_URL } from '../../../config/api';
+import { API_BASE_URL } from '../../../config/api';
 import axios from 'axios';
 
-export const createReview = (resData) => {
-  console.log("create review req ",resData)
-  return async (dispatch) => {
-    try {
-      const response = await api.post('/api/reviews/create', 
-        resData);
+export const createReview = (reqData) => async (dispatch) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/reviews/create`, 
+      reqData);
 
-      dispatch({
-        type: CREATE_REVIEW_SUCCESS,
-        payload: response.data
-      });
-      console.log("create review ",response.data)
-    } catch (error) {
-      dispatch({
-        type: CREATE_REVIEW_FAILURE,
-        payload: error.message
-      });
-    }
-  };
+    dispatch({
+      type: CREATE_REVIEW_SUCCESS,
+      payload: response.data
+    });
+  } catch (error) {
+    dispatch({
+      type: CREATE_REVIEW_FAILURE,
+      payload: error.message
+    });
+  }
 };
 
 export const getAllReviews = (productId) => {
@@ -41,7 +37,6 @@ export const getAllReviews = (productId) => {
         type: GET_ALL_REVIEWS_SUCCESS,
         payload: response.data
       });
-      console.log("all review ", response.data);
     } catch (error) {
       dispatch({
         type: GET_ALL_REVIEWS_FAILURE,
@@ -54,7 +49,7 @@ export const getAllReviews = (productId) => {
 export const createRating = (resData) => {
   return async (dispatch) => {
     try {
-      const response = await api.post('/api/ratings/create', 
+      const response = await axios.post(`${API_BASE_URL}/api/ratings/create`, 
         resData);
 
       dispatch({
@@ -71,10 +66,9 @@ export const createRating = (resData) => {
 };
 
 export const getAllRatings = (productId) => {
-  // console.log("product id review ",productId)
   return async (dispatch) => {
     try {
-      const response = await api.get(`/api/ratings/product/${productId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/ratings/product/${productId}`, {
        
       });
 
@@ -82,7 +76,6 @@ export const getAllRatings = (productId) => {
         type: GET_ALL_RATINGS_SUCCESS,
         payload: response.data
       });
-      console.log("all rating ",response.data)
     } catch (error) {
       dispatch({
         type: GET_ALL_RATINGS_FAILURE,

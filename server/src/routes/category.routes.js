@@ -8,6 +8,7 @@ const isAdmin = require('../middleware/isAdmin.js');
 // Public routes
 router.get('/', categoryController.getAllCategories);
 router.get('/featured', categoryController.getFeaturedCategories);
+router.get('/slug/:slug', categoryController.getCategoryBySlug);
 router.get('/:id', categoryController.getCategoryById);
 
 // Admin routes - protected with authentication and admin check

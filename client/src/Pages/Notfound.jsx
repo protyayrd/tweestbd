@@ -6,7 +6,6 @@ export default function NotFound() {
   // Only show Navigation component when not on the NotFound page
   // const showNavigation = location.pathname !== "*";
 
-  console.log("not found ---- path",location.pathname)
 
     return (
       <>

@@ -1,3 +1,46 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Allow: /about
+Allow: /services
+Allow: /projects
+Allow: /blog
+Allow: /events
+Allow: /contact
+Allow: /impact
+Allow: /join
+Allow: /faq
+
+# Prevent crawling of admin and private areas
+Disallow: /admin/
+Disallow: /private/
+Disallow: /api/
+Disallow: /backend/
+Disallow: /*?*
+Disallow: /*?
+Disallow: /search?
+Disallow: /user/
+Disallow: /dashboard/
+
+# Prevent indexing of non-production environments
+Disallow: /staging/
+Disallow: /dev/
+Disallow: /test/
+
+# Allow specific bots with custom crawl rates
+User-agent: Googlebot
+Crawl-delay: 1
+
+User-agent: bingbot
+Crawl-delay: 2
+
+User-agent: Yandex
+Crawl-delay: 2
+
+# Clean parameters
+Allow: /*?lang=
+Allow: /*?page=
+Allow: /*?category=
+
+# Sitemaps
+Sitemap: https://tweestbd.com/sitemap.xml
