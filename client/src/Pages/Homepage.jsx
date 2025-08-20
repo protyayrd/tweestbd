@@ -6,7 +6,7 @@ import { findProducts } from "../Redux/Customers/Product/Action";
 import { Box, Container, IconButton, Typography, Grid, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from '../config/api';
-import HomeCarousel from "../customer/Components/Carousel/HomeCarousel";
+const HomeCarousel = lazy(() => import("../customer/Components/Carousel/HomeCarousel"));
 import HomeProductCard from "../customer/Components/Home/HomeProductCard";
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -387,9 +387,11 @@ const Homepage = () => {
     <div>
       {/* Hero Slider Section */}
       <section className="slider-area position-relative">
-        <Box>
-          <HomeCarousel />
-        </Box>
+        <Suspense fallback={<div style={{ width: '100%', height: '40vh' }} /> }>
+          <Box>
+            <HomeCarousel />
+          </Box>
+        </Suspense>
       </section>
 
       {/* New Arrivals Per Level 3 Category */}

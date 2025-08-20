@@ -24,6 +24,7 @@ import { findProducts } from '../Redux/Customers/Product/Action';
 import { getCategories } from '../Redux/Admin/Category/Action';
 import { addItemToCart } from '../Redux/Customers/Cart/Action';
 import { getImageUrl } from '../config/api';
+import AddToCartModal from '../customer/Components/Cart/AddToCartModal';
 
 // Product card component
 const ProductCardComponent = ({ product, onAddToCart, loading }) => {
@@ -365,6 +366,7 @@ const CategoryProductPage = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [modalProduct, setModalProduct] = useState(null);
   
   const isMobile = useMediaQuery('(max-width:600px)');
   const isTablet = useMediaQuery('(max-width:960px)');
@@ -410,16 +412,27 @@ const CategoryProductPage = () => {
 
   // Handle add to cart
   const handleAddToCart = (product) => {
+    setModalProduct(product);
+  };
+
+  const handleConfirmAdd = async (selectedSize) => {
+    const product = modalProduct;
+    if (!product) return;
     setLoading(true);
-    
+
+    // Pick a color that has this size
+    let colorName = product.colors?.[0]?.name || 'Default';
+    const colorWithSize = product?.colors?.find(c => (c?.sizes || []).some(s => s?.name === selectedSize && (Number(s?.quantity) > 0 || s?.quantity === undefined)));
+    if (colorWithSize?.name) colorName = colorWithSize.name;
+
     if (auth.user) {
-      // Authenticated user - use Redux
-      dispatch(addItemToCart({
-        productId: product._id,
-        quantity: 1,
-        color: product.colors[0]?.name || 'Default',
-        size: product.sizes[0]?.name || 'Default'
-      })).then(() => {
+      try {
+        await dispatch(addItemToCart({
+          productId: product._id,
+          quantity: 1,
+          color: colorName,
+          size: selectedSize
+        }));
         setSnackbar({
           open: true,
           message: (
@@ -429,28 +442,22 @@ const CategoryProductPage = () => {
           ),
           severity: 'success'
         });
+      } catch (e) {
+        setSnackbar({ open: true, message: 'Failed to add to cart', severity: 'error' });
+      } finally {
         setLoading(false);
-      }).catch(() => {
-        setSnackbar({
-          open: true,
-          message: 'Failed to add to cart',
-          severity: 'error'
-        });
-        setLoading(false);
-      });
+        setModalProduct(null);
+      }
     } else {
-      // Guest user - use localStorage
+      // Guest user - localStorage
       try {
         const existingCart = JSON.parse(localStorage.getItem('guestCartItems') || '[]');
-        const colorName = product.colors?.[0]?.name || 'Default';
-        const sizeName = product.sizes?.[0]?.name || 'Default';
         const existingItemIndex = existingCart.findIndex(item => 
           item.productId === product._id && 
           item.color === colorName &&
-          item.size === sizeName
+          item.size === selectedSize
         );
 
-        // Enrich product snapshot for cart to match downstream expectations
         const productSnapshot = {
           _id: product._id,
           title: product.title,
@@ -470,10 +477,9 @@ const CategoryProductPage = () => {
             product: productSnapshot,
             quantity: 1,
             color: colorName,
-            size: sizeName
+            size: selectedSize
           });
         }
-
         localStorage.setItem('guestCartItems', JSON.stringify(existingCart));
         setSnackbar({
           open: true,
@@ -485,13 +491,11 @@ const CategoryProductPage = () => {
           severity: 'success'
         });
       } catch (error) {
-        setSnackbar({
-          open: true,
-          message: 'Failed to add to cart',
-          severity: 'error'
-        });
+        setSnackbar({ open: true, message: 'Failed to add to cart', severity: 'error' });
+      } finally {
+        setLoading(false);
+        setModalProduct(null);
       }
-      setLoading(false);
     }
   };
 
@@ -689,6 +693,13 @@ const CategoryProductPage = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+      {/* Size selection modal */}
+      <AddToCartModal
+        open={Boolean(modalProduct)}
+        onClose={() => setModalProduct(null)}
+        product={modalProduct}
+        onConfirm={handleConfirmAdd}
+      />
     </Box>
   );
 };

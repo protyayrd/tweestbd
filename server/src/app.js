@@ -92,10 +92,9 @@ const staticOptions = {
   maxAge: '30d', // Cache for 30 days for general static assets
   immutable: true,
   setHeaders: (res, path) => {
-    // Use strong caching for images to prevent reloading
-    if (path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png') || path.endsWith('.webp') || path.endsWith('.gif')) {
-      // 1 year cache for images with SWR
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable, stale-while-revalidate=86400');
+    // Cache images for 30 days
+    if (/(\.jpg|\.jpeg|\.png|\.webp| \.gif|\.svg|\.ico)$/i.test(path)) {
+      res.setHeader('Cache-Control', 'public, max-age=2592000');
     }
     // Cache fonts for 1 year
     if (path.endsWith('.woff') || path.endsWith('.woff2') || path.endsWith('.ttf') || path.endsWith('.otf')) {
@@ -129,8 +128,11 @@ if (process.env.NODE_ENV === 'production') {
       if (filePath.endsWith('.html')) {
         // Ensure index.html is always fresh
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      } else if (/\.(js|css|woff2|woff|ttf|otf|svg|png|jpg|jpeg|webp|gif|ico)$/i.test(filePath)) {
-        // Long cache for fingerprinted assets
+      } else if (/\.(png|jpg|jpeg|webp|gif|svg|ico)$/i.test(filePath)) {
+        // Cache images for 30 days
+        res.setHeader('Cache-Control', 'public, max-age=2592000');
+      } else if (/\.(js|css|woff2|woff|ttf|otf)$/i.test(filePath)) {
+        // Long cache for fingerprinted script/style/font assets
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       }
     }

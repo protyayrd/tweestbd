@@ -506,9 +506,14 @@ export default function Checkout() {
       // Create address object
       const city = deliveryArea === 'inside_dhaka' ? 'Dhaka' : 'Outside Dhaka';
 
+      // Derive first/last names robustly (server requires both)
+      const nameParts = (name || '').trim().split(/\s+/).filter(Boolean);
+      const firstName = nameParts[0] || 'Guest';
+      const lastName = nameParts.slice(1).join(' ') || firstName; // fallback to firstName if missing
+
       const addressData = {
-        firstName: name.split(' ')[0] || '',
-        lastName: name.split(' ')[1] || '',
+        firstName,
+        lastName,
         phoneNumber: phoneNumber,
         mobile: phoneNumber,
         streetAddress: address,
@@ -522,7 +527,7 @@ export default function Checkout() {
         pathao_city_id: deliveryArea === 'inside_dhaka' ? (cities.find(c => c.city_name?.toLowerCase() === 'dhaka')?.city_id || 1) : null,
         pathao_zone_id: null,
         pathao_area_id: null,
-        zipCode: formValues.zipCode,
+        zipCode: formValues.zipCode || '1212',
         isGuestCheckout: isGuestCheckout || isGuest,
         email: formValues.email || ''
       };
@@ -531,7 +536,7 @@ export default function Checkout() {
       const orderRequestData = {
         address: addressData,
         orderItems: effectiveCartItems.map((item) => ({
-          product: item?.product?._id,
+          product: item?.product?._id || item?.productId || item?._id,
           size: item?.size || "",
           quantity: item?.quantity || 1,
           price: item?.price || item?.product?.price || 0,
@@ -567,7 +572,8 @@ export default function Checkout() {
           });
           
           if (!response.ok) {
-            throw new Error('Failed to create guest order');
+            const errText = await response.text().catch(() => '');
+            throw new Error(errText || 'Failed to create guest order');
           }
           
           const orderData = await response.json();

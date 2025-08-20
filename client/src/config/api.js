@@ -1,5 +1,16 @@
 import axios from 'axios';
 
+// Disable verbose console logging in production to reduce JS execution time
+if (process.env.NODE_ENV === 'production') {
+  try {
+    // Only silence console.log to preserve warnings/errors
+    // eslint-disable-next-line no-console
+    console.log = () => {};
+  } catch (e) {
+    // no-op
+  }
+}
+
 // API Configuration
 const getBaseUrl = () => {
   const hostname = window.location.hostname;

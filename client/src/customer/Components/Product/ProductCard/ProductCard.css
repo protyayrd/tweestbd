@@ -1,19 +1,16 @@
 .productCard .textPart {
-    transition: transform 0.3s ease-out;
-  }
-.productCard:hover .textPart{
-    transform: translateY(-1rem);
+    transition: none;
+}
 
+/* Remove hover effects for a cleaner, static card */
+.productCard:hover .textPart{
 }
 
 .productCard:hover{
-  box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
 }
 
 .productCard:hover .secondary-image {
-  opacity: 1;
 }
 
 .productCard:hover .primary-image {
-  opacity: 0;
 }

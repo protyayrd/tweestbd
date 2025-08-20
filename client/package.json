@@ -48,7 +48,7 @@
   },
   "scripts": {
     "start": "craco start",
-    "build": "GENERATE_SOURCEMAP=false craco build",
+    "build": "GENERATE_SOURCEMAP=false craco build && node remove-console-logs.js",
     "build:clean": "rm -rf build && npm run build",
     "build:analyze": "npm run build && npx serve -s build",
     "test": "craco test",
