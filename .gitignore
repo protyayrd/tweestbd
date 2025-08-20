@@ -1,0 +1,58 @@
+# Root gitignore for Tweest monorepo (client + server)
+
+# Node dependencies
+node_modules/
+
+# Logs
+*.log
+logs
+server/logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+client/.env
+client/.env.*
+server/.env
+server/.env.*
+
+# Build outputs / coverage
+client/build/
+client/coverage/
+server/coverage/
+coverage/
+build/
+dist/
+out/
+
+# Caches / temporary
+.cache/
+client/.cache/
+server/.cache/
+.tmp/
+temp/
+
+# Framework/platform
+.next/
+.vercel/
+.vite/
+.netlify/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Uploads (runtime-generated)
+server/public/uploads/
+
+# Misc backups
+*.backup
+
